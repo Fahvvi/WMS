@@ -1,59 +1,126 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# 📦 WMS Pro (Warehouse Management System)
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+![WMS Pro Banner](https://img.shields.io/badge/Status-Development-orange) ![Laravel](https://img.shields.io/badge/Laravel-12.x-red) ![React](https://img.shields.io/badge/React-Inertia-blue) ![Tailwind](https://img.shields.io/badge/Tailwind-CSS-06B6D4)
 
-## About Laravel
+Sistem Manajemen Gudang (WMS) modern yang dirancang untuk efisiensi tinggi dengan fitur **Barcode Scanner First**, manajemen stok real-time, dan antarmuka *Enterprise-grade*.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+Dibuat untuk memudahkan proses Inbound, Outbound, dan Stock Opname dengan pengalaman pengguna (UX) yang minim klik.
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## 🚀 Fitur Unggulan
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+### 1. 📷 Inbound Scanner Mode
+- **Scan-to-Action:** Input barang masuk hanya dengan barcode scanner tanpa mouse.
+- **Auto Detection:** Otomatis mendeteksi barang yang sudah ada.
+- **Quick Add Modal:** Jika barang belum terdaftar, popup modal muncul otomatis untuk registrasi cepat.
 
-## Learning Laravel
+### 2. 📊 Interactive Dashboard
+- Statistik Total Produk & Stok Fisik.
+- Grafik/List Inbound & Outbound terbaru.
+- Monitoring User Aktif & Log Aktivitas (Timeline).
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+### 3. 📦 Master Inventory (Enterprise Grid)
+- Tampilan Data Grid yang padat dan informatif.
+- Indikator **Low Stock Alert** (Warna merah jika stok menipis).
+- CRUD Lengkap (Edit & Hapus dengan proteksi).
+- Cetak Label/Barcode Produk.
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+### 4. ⚙️ Pengaturan & Utilitas
+- **Multi-Warehouse Management:** Tambah/Edit lokasi gudang.
+- **Attribute Management:** Kelola Satuan (Pcs, Box) & Kategori.
+- **User Management:** Hak akses Superadmin & Staff.
 
-## Laravel Sponsors
+---
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+## 🛠️ Teknologi yang Digunakan
 
-### Premium Partners
+* **Backend:** [Laravel 12](https://laravel.com)
+* **Frontend:** [React.js](https://reactjs.org) via [Inertia.js](https://inertiajs.com)
+* **Styling:** [Tailwind CSS](https://tailwindcss.com)
+* **Icons:** [Lucide React](https://lucide.dev)
+* **Database:** PostgreSQL / MySQL
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+---
 
-## Contributing
+## 📸 Screenshots
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+*(Silakan drag & drop screenshot aplikasi Anda di area ini)*
 
-## Code of Conduct
+| Dashboard | Inbound Scanner |
+|Str|Str|
+| ![Dashboard](link-gambar-dashboard-anda) | ![Inbound](link-gambar-inbound-anda) |
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+| Inventory Grid | Settings |
+|Str|Str|
+| ![Inventory](link-gambar-inventory-anda) | ![Settings](link-gambar-settings-anda) |
 
-## Security Vulnerabilities
+---
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+## 💻 Cara Instalasi (Local Development)
 
-## License
+Ikuti langkah ini untuk menjalankan proyek di komputer lokal:
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+### Prasyarat
+- PHP >= 8.2
+- Composer
+- Node.js & NPM
+- PostgreSQL / MySQL
+
+### Langkah-langkah
+
+1.  **Clone Repositori**
+    ```bash
+    git clone [https://github.com/Fahvvi/WMS.git](https://github.com/Fahvvi/WMS.git)
+    cd WMS
+    ```
+
+2.  **Install Dependencies**
+    ```bash
+    composer install
+    npm install
+    ```
+
+3.  **Setup Environment**
+    Salin file `.env.example` menjadi `.env` dan atur koneksi database Anda.
+    ```bash
+    cp .env.example .env
+    php artisan key:generate
+    ```
+
+4.  **Migrasi Database**
+    ```bash
+    php artisan migrate
+    ```
+
+5.  **Jalankan Aplikasi**
+    Buka dua terminal terpisah untuk menjalankan server Laravel dan Vite (Frontend).
+
+    *Terminal 1:*
+    ```bash
+    php artisan serve
+    ```
+
+    *Terminal 2:*
+    ```bash
+    npm run dev
+    ```
+
+6.  **Akses Aplikasi**
+    Buka browser dan kunjungi `http://localhost:8000`
+
+---
+
+## 📝 To-Do / Roadmap
+
+- [x] Inbound Scanner Logic
+- [x] Master Inventory CRUD
+- [x] Warehouse Management
+- [x] Dashboard Analytics
+- [ ] Fitur Cetak Surat Jalan (Delivery Order)
+- [ ] Laporan PDF Export
+- [ ] Stock Opname Adjustment
+
+---
+
+## 🔒 License
+
+Proyek ini adalah *proprietary software* untuk penggunaan internal/pribadi.
