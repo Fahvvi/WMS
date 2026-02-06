@@ -13,8 +13,8 @@ return new class extends Migration
     {
         Schema::create('units', function (Blueprint $table) {
             $table->id();
-            $table->string('name')->unique(); // Misal: Pcs, Box, Kg
-            $table->string('description')->nullable();
+            $table->string('name'); // Contoh: Pieces, Box, Kilogram
+            $table->string('short_name')->nullable(); // Contoh: Pcs, Bx, Kg
             $table->timestamps();
         });
     }

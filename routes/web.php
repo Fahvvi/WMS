@@ -6,6 +6,8 @@ use App\Http\Controllers\TransactionController;
 use App\Http\Controllers\WarehouseController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\SettingController;
+use App\Http\Controllers\AttributeController;
+use App\Http\Controllers\CategoryController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -66,19 +68,26 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/warehouses', [SettingController::class, 'warehouseIndex'])->name('warehouses.index');
 
         // 2. Attributes (Category & Unit)
-        Route::get('/attributes', [SettingController::class, 'attributeIndex'])->name('attributes.index');
+        Route::get('/attributes', [AttributeController::class, 'index'])->name('attributes.index');
         
         // Aksi Simpan/Hapus Kategori & Unit
-        Route::post('/categories', [SettingController::class, 'storeCategory'])->name('categories.store');
-        Route::delete('/categories/{category}', [SettingController::class, 'destroyCategory'])->name('categories.destroy');
-        Route::post('/units', [SettingController::class, 'storeUnit'])->name('units.store');
-        Route::delete('/units/{unit}', [SettingController::class, 'destroyUnit'])->name('units.destroy');
+        Route::post('/units', [AttributeController::class, 'storeUnit'])->name('units.store');
+        Route::put('/units/{unit}', [AttributeController::class, 'updateUnit'])->name('units.update');
+        Route::delete('/units/{unit}', [AttributeController::class, 'destroyUnit'])->name('units.destroy');
+
+        // CRUD Kategori
+        Route::post('/categories', [AttributeController::class, 'storeCategory'])->name('categories.store');
+        Route::put('/categories/{category}', [AttributeController::class, 'updateCategory'])->name('categories.update');
+        Route::delete('/categories/{category}', [AttributeController::class, 'destroyCategory'])->name('categories.destroy');
 
         // 3. Users
-        Route::get('/users', [SettingController::class, 'userIndex'])->name('users.index');
+        Route::resource('users', \App\Http\Controllers\UserController::class)->except(['create', 'show', 'edit']);
     
         // 4. Material Creation
         Route::get('/materials', [SettingController::class, 'materialCreate'])->name('materials.create');
+        
+        // 5. Manajemen Kategori
+        Route::resource('categories', CategoryController::class)->except(['show', 'create', 'edit']);
         });
 
     // --- LOGIC CRUD GUDANG (Tanpa Tampilan) ---

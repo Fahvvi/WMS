@@ -12,6 +12,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class TransactionController extends Controller
 {
@@ -42,40 +43,38 @@ class TransactionController extends Controller
 
     public function create(Request $request)
     {
-        $type = $request->input('type', 'inbound');
+        $type = $request->query('type', 'inbound'); 
+
+        // 1. LOGIC FIX: Generate Nomor Transaksi 'TRX-YYYYMMDD-XXXX'
+        $today = date('Ymd');
+        $prefix = 'TRX-' . $today . '-'; // Format Prefix seragam
         
-        // --- GENERATE NOMOR TRANSAKSI BARU (TRX-YYYYMMDD00001) ---
-        $prefix = 'TRX-' . date('Ymd'); // Contoh: TRX-20260206
-        
-        // Cari transaksi terakhir hari ini (apapun tipenya)
+        // Cari nomor terakhir hari ini yang depannya TRX-YYYYMMDD-
         $lastTrx = Transaction::where('trx_number', 'like', $prefix . '%')
-            ->orderBy('id', 'desc')
+            ->orderByRaw("CAST(SUBSTRING(trx_number FROM " . (strlen($prefix) + 1) . ") AS INTEGER) DESC")
             ->first();
-        
-        // Ambil 5 digit terakhir, ubah jadi integer, lalu tambah 1
+
+        $nextNumber = 1;
         if ($lastTrx) {
-            // Asumsi format TRX-2026020600001 (total 17 karakter, ambil 5 digit dari belakang)
-            $lastSequence = intval(substr($lastTrx->trx_number, -5));
-            $sequence = $lastSequence + 1;
-        } else {
-            $sequence = 1;
+            // Ambil 4 digit terakhir
+            $lastNumber = intval(substr($lastTrx->trx_number, -4));
+            $nextNumber = $lastNumber + 1;
         }
 
-        // Gabungkan kembali: TRX-20260206 + 00001
-        $newTrxNumber = $prefix . str_pad($sequence, 5, '0', STR_PAD_LEFT);
+        // Hasil: TRX-20260206-0001
+        $newTrxNumber = $prefix . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
 
         return Inertia::render('Transaction/Create', [
             'type' => $type,
-            'warehouses' => Warehouse::where('is_active', true)->get(),
             'newTrxNumber' => $newTrxNumber,
-            // Kirim daftar unit untuk dropdown (Type-to-Filter)
-            'units' => Unit::orderBy('name')->pluck('name'), 
+            'warehouses' => Warehouse::all(),
+            'units' => Unit::orderBy('name')->pluck('short_name'), 
+            'categories' => \App\Models\Category::orderBy('name')->get(),
         ]);
     }
 
     public function store(Request $request)
     {
-        // Validasi input
         $request->validate([
             'type' => 'required|in:inbound,outbound',
             'trx_number' => 'required|string|unique:transactions,trx_number',
@@ -87,10 +86,31 @@ class TransactionController extends Controller
         ]);
 
         try {
-            // Mulai Database Transaction (Semua sukses atau semua gagal)
             DB::beginTransaction();
 
-            // 1. Simpan Header Transaksi
+            // 2. LOGIC FIX: Validasi Stok untuk OUTBOUND
+            if ($request->type === 'outbound') {
+                foreach ($request->items as $item) {
+                    // Cek stok di GUDANG YANG DIPILIH
+                    $currentStock = Stock::where('product_id', $item['product_id'])
+                        ->where('warehouse_id', $request->warehouse_id)
+                        ->value('quantity'); // Ambil nilai quantity langsung
+
+                    $currentStock = $currentStock ?? 0; // Jika null, anggap 0
+
+                    // Jika stok kurang, batalkan transaksi
+                    if ($currentStock < $item['quantity']) {
+                        // Ambil nama produk untuk pesan error yang jelas
+                        $productName = Product::find($item['product_id'])->name;
+                        
+                        throw ValidationException::withMessages([
+                            'items' => "Stok '$productName' di gudang ini tidak cukup. Sisa: $currentStock, Diminta: {$item['quantity']}"
+                        ]);
+                    }
+                }
+            }
+
+            // 3. Simpan Header Transaksi
             $transaction = Transaction::create([
                 'user_id' => auth()->id(),
                 'warehouse_id' => $request->warehouse_id,
@@ -101,53 +121,42 @@ class TransactionController extends Controller
                 'status' => 'completed', 
             ]);
 
-            // 2. Loop Setiap Barang & Update Stok
+            // 4. Loop Items & Update Stock
             foreach ($request->items as $item) {
                 
-                // A. Simpan Detail Riwayat
                 TransactionDetail::create([
                     'transaction_id' => $transaction->id,
                     'product_id' => $item['product_id'],
                     'quantity' => $item['quantity'],
                 ]);
 
-                // B. UPDATE TABEL STOCK
                 if ($request->type === 'inbound') {
-                    // INBOUND: Tambah Stok
-                    // Cari stok lama, kalau belum ada buat baru dengan qty 0
+                    // Inbound: Tambah Stok
                     $stock = Stock::firstOrCreate(
-                        [
-                            'product_id' => $item['product_id'],
-                            'warehouse_id' => $request->warehouse_id
-                        ],
+                        ['product_id' => $item['product_id'], 'warehouse_id' => $request->warehouse_id],
                         ['quantity' => 0]
                     );
-                    
-                    // Tambahkan jumlah baru
                     $stock->increment('quantity', $item['quantity']);
-
                 } else {
-                    // OUTBOUND: Kurangi Stok
-                    $stock = Stock::where('product_id', $item['product_id'])
+                    // Outbound: Kurangi Stok (Sudah divalidasi di atas, jadi aman)
+                    Stock::where('product_id', $item['product_id'])
                         ->where('warehouse_id', $request->warehouse_id)
-                        ->first();
-
-                    if ($stock) {
-                        $stock->decrement('quantity', $item['quantity']);
-                    }
+                        ->decrement('quantity', $item['quantity']);
                 }
             }
 
-            // Simpan perubahan ke database
             DB::commit();
 
             return redirect()->route('transactions.index', ['type' => $request->type])
-                             ->with('success', 'Transaksi berhasil disimpan & Stok terupdate.');
+                             ->with('success', 'Transaksi berhasil disimpan.');
 
         } catch (\Exception $e) {
-            // Batalkan semua perubahan jika ada error
             DB::rollBack();
-            return back()->withErrors(['error' => 'Gagal menyimpan transaksi: ' . $e->getMessage()]);
+            // Lempar kembali error validasi agar muncul di form frontend
+            if ($e instanceof ValidationException) {
+                throw $e;
+            }
+            return back()->withErrors(['error' => 'Gagal: ' . $e->getMessage()]);
         }
     }
 }

@@ -24,6 +24,9 @@
     },
     "dependencies": {
         "html5-qrcode": "^2.3.8",
-        "lucide-react": "^0.563.0"
+        "lucide-react": "^0.563.0",
+        "react-hot-toast": "^2.6.0",
+        "sweetalert2": "^11.26.18",
+        "sweetalert2-react-content": "^5.1.1"
     }
 }

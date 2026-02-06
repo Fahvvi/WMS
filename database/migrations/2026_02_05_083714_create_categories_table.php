@@ -11,11 +11,14 @@ return new class extends Migration
      */
     public function up()
     {
-        Schema::create('categories', function (Blueprint $table) {
-            $table->id();
-            $table->string('name')->unique();
-            $table->timestamps();
-        });
+    Schema::create('categories', function (Blueprint $table) {
+        $table->id();
+        $table->string('name'); // Nama: "Battery"
+        $table->string('code')->unique(); // Kode: "BT" (Wajib Unik)
+        $table->string('color')->default('#6366f1'); // Warna Default (Indigo)
+        $table->foreignId('parent_id')->nullable()->constrained('categories')->onDelete('set null'); // Fitur Hirarki
+        $table->timestamps();
+    });
     }
 
     /**

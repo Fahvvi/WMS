@@ -79,7 +79,6 @@ class SettingController extends Controller
         $selectedCategory = $request->input('category');
         $search = $request->input('search');
 
-        // Ambil Produk dengan filter Kategori & Search
         $materials = Product::query()
             ->when($selectedCategory, function($q) use ($selectedCategory) {
                 $q->where('category', $selectedCategory);
@@ -89,13 +88,17 @@ class SettingController extends Controller
                   ->orWhere('sku', 'ilike', "%{$search}%");
             })
             ->orderBy('created_at', 'desc')
-            ->paginate(15) // Lebih banyak per halaman biar padat
+            ->paginate(15)
             ->withQueryString();
 
         return Inertia::render('Settings/Material', [
             'materials' => $materials,
-            'categories' => Category::orderBy('name')->get(), // Ambil objek lengkap untuk Sidebar
-            'units' => Unit::orderBy('name')->pluck('name'),
+            'categories' => Category::orderBy('name')->get(),
+            
+            // PERBAIKAN DISINI: Ambil 'short_name' sebagai ganti 'name'
+            // Pastikan tabel units sudah ada isinya di kolom short_name (misal: Pcs, Kg, Box)
+            'units' => Unit::orderBy('name')->pluck('short_name'), 
+            
             'currentCategory' => $selectedCategory,
             'filters' => $request->only(['search', 'category'])
         ]);

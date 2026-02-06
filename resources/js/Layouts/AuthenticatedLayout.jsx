@@ -1,14 +1,43 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react'; // Tambahkan useEffect
 import { Link, usePage } from '@inertiajs/react';
-// PERBAIKAN 1: Ganti 'settings' (kecil) jadi 'Settings' (Besar)
 import { Menu, X, Bell, LogOut, User, LayoutDashboard, Package, ChevronDown, ArrowDownLeft, ArrowUpRight, Settings } from 'lucide-react';
+import { Toaster, toast } from 'react-hot-toast'; // Tambahkan toast
 
 export default function AuthenticatedLayout({ user, header, children }) {
     const [showingNavigationDropdown, setShowingNavigationDropdown] = useState(false);
     const [showProfileMenu, setShowProfileMenu] = useState(false);
 
+    // --- LOGIC TAMBAHAN: GLOBAL TOAST LISTENER ---
+    const { props } = usePage(); 
+    const flash = props.flash || {};
+
+    useEffect(() => {
+        if (flash?.success) {
+            toast.success(flash.success, {
+                style: { borderRadius: '10px', background: '#333', color: '#fff' },
+            });
+        }
+        if (flash?.error) {
+            toast.error(flash.error, {
+                style: { borderRadius: '10px', background: '#ef4444', color: '#fff' },
+            });
+        }
+    }, [flash]);
+    // ---------------------------------------------
+
     return (
         <div className="min-h-screen bg-slate-50">
+            {/* PASANG TOASTER Paling Atas */}
+            <Toaster 
+                position="top-center" 
+                toastOptions={{
+                    duration: 3000,
+                    style: { background: '#334155', color: '#fff' },
+                    success: { style: { background: '#10b981' } },
+                    error: { style: { background: '#ef4444' } },
+                }} 
+            />
+
             <nav className="bg-white/80 backdrop-blur-md border-b border-slate-200 fixed w-full z-50 transition-all">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex justify-between h-16">
@@ -48,7 +77,6 @@ export default function AuthenticatedLayout({ user, header, children }) {
                                     Inventory
                                 </NavLink>
 
-                                {/* PERBAIKAN 2: Update rute jadi 'settings.warehouses.index' dan Icon Settings */}
                                 <NavLink 
                                     href={route('settings.warehouses.index')} 
                                     active={route().current('settings.*')} 
@@ -121,11 +149,14 @@ export default function AuthenticatedLayout({ user, header, children }) {
                             Inbound
                         </MobileNavLink>
                         
+                        <MobileNavLink href={route('transactions.index', { type: 'outbound' })} active={route().current('transactions.index') && route().params.type === 'outbound'} icon={<ArrowUpRight size={18}/>}>
+                            Outbound
+                        </MobileNavLink>
+                        
                         <MobileNavLink href={route('products.index')} active={route().current('products.*')} icon={<Package size={18}/>}>
                             Inventory
                         </MobileNavLink>
 
-                        {/* PERBAIKAN 3: Mobile Menu juga harus pakai rute baru */}
                         <MobileNavLink href={route('settings.warehouses.index')} active={route().current('settings.*')} icon={<Settings size={18}/>}>
                             Settings
                         </MobileNavLink>
