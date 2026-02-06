@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Category;
 use App\Models\Unit;
+use App\Models\Product;
 use App\Models\User;
 use App\Models\Warehouse; // Jangan lupa import ini
 use Illuminate\Http\Request;
@@ -72,4 +73,34 @@ class SettingController extends Controller
         $unit->delete();
         return back()->with('success', 'Satuan Unit dihapus');
     }
+    
+    public function materialCreate(Request $request)
+    {
+        $selectedCategory = $request->input('category');
+        $search = $request->input('search');
+
+        // Ambil Produk dengan filter Kategori & Search
+        $materials = Product::query()
+            ->when($selectedCategory, function($q) use ($selectedCategory) {
+                $q->where('category', $selectedCategory);
+            })
+            ->when($search, function($q) use ($search) {
+                $q->where('name', 'ilike', "%{$search}%")
+                  ->orWhere('sku', 'ilike', "%{$search}%");
+            })
+            ->orderBy('created_at', 'desc')
+            ->paginate(15) // Lebih banyak per halaman biar padat
+            ->withQueryString();
+
+        return Inertia::render('Settings/Material', [
+            'materials' => $materials,
+            'categories' => Category::orderBy('name')->get(), // Ambil objek lengkap untuk Sidebar
+            'units' => Unit::orderBy('name')->pluck('name'),
+            'currentCategory' => $selectedCategory,
+            'filters' => $request->only(['search', 'category'])
+        ]);
+    }
 }
+
+
+

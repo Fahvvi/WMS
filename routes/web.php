@@ -47,7 +47,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // PENTING: Route spesifik (check/print) harus DI ATAS resource agar tidak dianggap sebagai ID produk
     Route::get('/products/check', [ProductController::class, 'check'])->name('products.check');
     Route::get('/products/{product}/print', [ProductController::class, 'printLabel'])->name('products.print');
-    
+    Route::get('/products/{product}/history', [ProductController::class, 'history'])->name('products.history');
+
     // Resource CRUD Standar (Index, Store, Update, Destroy)
     Route::resource('products', ProductController::class);
 
@@ -75,7 +76,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         // 3. Users
         Route::get('/users', [SettingController::class, 'userIndex'])->name('users.index');
-    });
+    
+        // 4. Material Creation
+        Route::get('/materials', [SettingController::class, 'materialCreate'])->name('materials.create');
+        });
 
     // --- LOGIC CRUD GUDANG (Tanpa Tampilan) ---
     // Kita taruh di luar group settings agar nama routenya tetap standar 'warehouses.store', 'warehouses.update'

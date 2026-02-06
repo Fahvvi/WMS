@@ -1,6 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, usePage } from '@inertiajs/react';
-import { Warehouse, Tag, Users, Settings } from 'lucide-react';
+import { Warehouse, Tag, Users, Settings, Package } from 'lucide-react';
 
 export default function SettingsLayout({ children, title }) {
     const { url } = usePage();
@@ -8,6 +8,7 @@ export default function SettingsLayout({ children, title }) {
     const menuItems = [
         { name: 'Data Gudang', href: route('settings.warehouses.index'), icon: <Warehouse size={18} /> },
         { name: 'Unit & Kategori', href: route('settings.attributes.index'), icon: <Tag size={18} /> },
+        { name: 'Material Creation', href: route('settings.materials.create'), icon: <Package size={18} /> },
         { name: 'Manajemen User', href: route('settings.users.index'), icon: <Users size={18} /> },
     ];
 

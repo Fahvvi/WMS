@@ -10,7 +10,6 @@ class Product extends Model
 {
     // use LogsActivity;
 
-    // --- UPDATE BAGIAN INI ---
     protected $fillable = [
         'name', 
         'sku', 
