@@ -123,4 +123,5 @@ Ikuti langkah ini untuk menjalankan proyek di komputer lokal:
 
 ## 🔒 License
 
-Proyek ini adalah *proprietary software* untuk penggunaan internal/pribadi.
+Proyek ini adalah *proprietary software* untuk penggunaan internal/pribadi. Untuk kebutuhan PT Selaras Donlim Indonesia
+
