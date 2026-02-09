@@ -1,11 +1,16 @@
-import { useState, useEffect } from 'react'; // Tambahkan useEffect
+import { useState, useEffect, useRef } from 'react';
 import { Link, usePage } from '@inertiajs/react';
-import { Menu, X, Bell, LogOut, User, LayoutDashboard, Package, ChevronDown, ArrowDownLeft, ArrowUpRight, Settings } from 'lucide-react';
-import { Toaster, toast } from 'react-hot-toast'; // Tambahkan toast
+// Tambahkan ArrowRightLeft dan ClipboardList ke import
+import { Menu, X, Bell, LogOut, User, LayoutDashboard, Package, ChevronDown, ArrowDownLeft, ArrowUpRight, Settings, ArrowRightLeft, ClipboardList } from 'lucide-react';
+import { Toaster, toast } from 'react-hot-toast';
 
 export default function AuthenticatedLayout({ user, header, children }) {
     const [showingNavigationDropdown, setShowingNavigationDropdown] = useState(false);
     const [showProfileMenu, setShowProfileMenu] = useState(false);
+    
+    // State untuk Dropdown Master Inventory (Desktop)
+    const [showInventoryMenu, setShowInventoryMenu] = useState(false);
+    const inventoryTimeoutRef = useRef(null); // Untuk delay hover
 
     // --- LOGIC TAMBAHAN: GLOBAL TOAST LISTENER ---
     const { props } = usePage(); 
@@ -23,7 +28,18 @@ export default function AuthenticatedLayout({ user, header, children }) {
             });
         }
     }, [flash]);
-    // ---------------------------------------------
+    
+    // Logic Hover Dropdown (Agar tidak kaget saat mouse geser dikit)
+    const handleMouseEnter = () => {
+        if (inventoryTimeoutRef.current) clearTimeout(inventoryTimeoutRef.current);
+        setShowInventoryMenu(true);
+    };
+
+    const handleMouseLeave = () => {
+        inventoryTimeoutRef.current = setTimeout(() => {
+            setShowInventoryMenu(false);
+        }, 200);
+    };
 
     return (
         <div className="min-h-screen bg-slate-50">
@@ -55,7 +71,6 @@ export default function AuthenticatedLayout({ user, header, children }) {
                                     Dashboard
                                 </NavLink>
                                 
-                                {/* Menu Inbound */}
                                 <NavLink 
                                     href={route('transactions.index', { type: 'inbound' })} 
                                     active={route().current('transactions.index') && route().params.type === 'inbound'} 
@@ -64,7 +79,6 @@ export default function AuthenticatedLayout({ user, header, children }) {
                                     Inbound
                                 </NavLink>
 
-                                {/* Menu Outbound */}
                                 <NavLink 
                                     href={route('transactions.index', { type: 'outbound' })} 
                                     active={route().current('transactions.index') && route().params.type === 'outbound'} 
@@ -73,16 +87,54 @@ export default function AuthenticatedLayout({ user, header, children }) {
                                     Outbound
                                 </NavLink>
                                 
-                                <NavLink href={route('products.index')} active={route().current('products.*')} icon={<Package size={18}/>}>
-                                    Inventory
-                                </NavLink>
+                                {/* --- DROPDOWN MASTER INVENTORY (BARU) --- */}
+                                <div 
+                                    className="relative flex items-center"
+                                    onMouseEnter={handleMouseEnter}
+                                    onMouseLeave={handleMouseLeave}
+                                >
+                                    <button 
+                                        className={`inline-flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 gap-2 ${
+                                            route().current('products.*') || route().current('stock-transfers.*')
+                                                ? 'bg-indigo-50 text-indigo-700 shadow-sm'
+                                                : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                                        }`}
+                                    >
+                                        <Package size={18} />
+                                        Master Inventory
+                                        <ChevronDown size={14} className={`transition-transform duration-200 ${showInventoryMenu ? 'rotate-180' : ''}`} />
+                                    </button>
+
+                                    {/* Dropdown Content */}
+                                    {showInventoryMenu && (
+                                        <div className="absolute top-full left-0 mt-1 w-56 bg-white rounded-xl shadow-xl border border-slate-100 py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+                                            <div className="px-4 py-2 text-xs font-bold text-slate-400 uppercase tracking-wider">
+                                                Manajemen Stok
+                                            </div>
+                                            
+                                            <DropdownLink href={route('products.index')} active={route().current('products.*')}>
+                                                <Package size={16} /> Data Barang
+                                            </DropdownLink>
+                                            
+                                            <DropdownLink href={route('stock-transfers.index')} active={route().current('stock-transfers.*')}>
+                                                <ArrowRightLeft size={16} /> Transfer Stok
+                                            </DropdownLink>
+                                            
+                                            <div className="px-4 py-2">
+                                                <button disabled className="flex items-center gap-3 w-full text-left text-sm font-medium text-slate-300 cursor-not-allowed">
+                                                    <ClipboardList size={16} /> Stock Opname
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
 
                                 <NavLink 
                                     href={route('settings.warehouses.index')} 
                                     active={route().current('settings.*')} 
                                     icon={<Settings size={18}/>}
                                 >
-                                    General / Settings
+                                    Settings
                                 </NavLink>
                             </div>
                         </div>
@@ -139,7 +191,7 @@ export default function AuthenticatedLayout({ user, header, children }) {
                 </div>
 
                 {/* Mobile Menu Slide */}
-                <div className={`${showingNavigationDropdown ? 'block' : 'hidden'} sm:hidden bg-white border-t border-slate-100 absolute w-full shadow-xl`}>
+                <div className={`${showingNavigationDropdown ? 'block' : 'hidden'} sm:hidden bg-white border-t border-slate-100 absolute w-full shadow-xl max-h-[80vh] overflow-y-auto`}>
                     <div className="pt-2 pb-3 space-y-1 px-4">
                         <MobileNavLink href={route('dashboard')} active={route().current('dashboard')} icon={<LayoutDashboard size={18}/>}>
                             Dashboard
@@ -153,9 +205,16 @@ export default function AuthenticatedLayout({ user, header, children }) {
                             Outbound
                         </MobileNavLink>
                         
-                        <MobileNavLink href={route('products.index')} active={route().current('products.*')} icon={<Package size={18}/>}>
-                            Inventory
-                        </MobileNavLink>
+                        {/* Mobile Group: Master Inventory */}
+                        <div className="py-2 border-t border-b border-slate-100 my-1">
+                            <p className="px-3 text-xs font-bold text-slate-400 uppercase mb-1">Master Inventory</p>
+                            <MobileNavLink href={route('products.index')} active={route().current('products.*')} icon={<Package size={18}/>}>
+                                Data Barang
+                            </MobileNavLink>
+                            <MobileNavLink href={route('stock-transfers.index')} active={route().current('stock-transfers.*')} icon={<ArrowRightLeft size={18}/>}>
+                                Transfer Stok
+                            </MobileNavLink>
+                        </div>
 
                         <MobileNavLink href={route('settings.warehouses.index')} active={route().current('settings.*')} icon={<Settings size={18}/>}>
                             Settings
@@ -195,6 +254,8 @@ export default function AuthenticatedLayout({ user, header, children }) {
     );
 }
 
+// --- SUB COMPONENTS ---
+
 function NavLink({ href, active, children, icon }) {
     return (
         <Link
@@ -206,6 +267,21 @@ function NavLink({ href, active, children, icon }) {
             }`}
         >
             {icon}
+            {children}
+        </Link>
+    );
+}
+
+function DropdownLink({ href, active, children }) {
+    return (
+        <Link
+            href={href}
+            className={`flex items-center gap-3 w-full px-4 py-2 text-sm font-medium transition-colors ${
+                active
+                    ? 'bg-indigo-50 text-indigo-700 border-l-2 border-indigo-600'
+                    : 'text-slate-600 hover:bg-slate-50 hover:text-slate-800 border-l-2 border-transparent'
+            }`}
+        >
             {children}
         </Link>
     );

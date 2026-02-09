@@ -1,13 +1,14 @@
 <?php
 
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\TransactionController;
+use App\Http\Controllers\StockTransferController;
 use App\Http\Controllers\WarehouseController;
-use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\SettingController;
 use App\Http\Controllers\AttributeController;
-use App\Http\Controllers\CategoryController;
+use App\Http\Controllers\UserController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -29,70 +30,96 @@ Route::get('/', function () {
 
 /*
 |--------------------------------------------------------------------------
-| Authenticated Routes
+| Authenticated Routes (Protected)
 |--------------------------------------------------------------------------
 */
 
 Route::middleware(['auth', 'verified'])->group(function () {
 
-    // --- DASHBOARD ---
-    Route::get('/dashboard', [DashboardController::class, 'index'])
-    ->middleware(['auth', 'verified'])
-    ->name('dashboard');
+    // =========================================================================
+    // 1. DASHBOARD & PROFILE
+    // =========================================================================
+    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
-    // --- PROFILE ---
-    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
-    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
-    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+    Route::prefix('profile')->name('profile.')->group(function () {
+        Route::get('/', [ProfileController::class, 'edit'])->name('edit');
+        Route::patch('/', [ProfileController::class, 'update'])->name('update');
+        Route::delete('/', [ProfileController::class, 'destroy'])->name('destroy');
+    });
 
-    // --- MODULE: INVENTORY (PRODUCTS) ---
-    // PENTING: Route spesifik (check/print) harus DI ATAS resource agar tidak dianggap sebagai ID produk
-    Route::get('/products/check', [ProductController::class, 'check'])->name('products.check');
-    Route::get('/products/{product}/print', [ProductController::class, 'printLabel'])->name('products.print');
-    Route::get('/products/{product}/history', [ProductController::class, 'history'])->name('products.history');
+    // =========================================================================
+    // 2. MASTER INVENTORY (Products & Stock Transfers)
+    // =========================================================================
+    
+    // A. STOCK TRANSFERS
+    Route::prefix('inventory')->name('stock-transfers.')->group(function () {
+        Route::get('/transfers', [StockTransferController::class, 'index'])->name('index');
+        Route::get('/transfers/create', [StockTransferController::class, 'create'])->name('create');
+        Route::post('/transfers', [StockTransferController::class, 'store'])->name('store');
+        Route::get('/stocks/{warehouse}', [StockTransferController::class, 'getWarehouseStocks'])->name('get-stocks');
+    });
 
-    // Resource CRUD Standar (Index, Store, Update, Destroy)
+    // B. PRODUCTS (Master Data Barang)
+    // Note: Route custom (check/print) HARUS diletakkan SEBELUM Route::resource
+    Route::prefix('products')->name('products.')->group(function () {
+        Route::get('/check', [ProductController::class, 'check'])->name('check'); // Cek barcode
+        Route::get('/{product}/print', [ProductController::class, 'printLabel'])->name('print');
+        Route::get('/{product}/history', [ProductController::class, 'history'])->name('history');
+    });
+    
+    // Resource Produk (index, store, update, destroy)
     Route::resource('products', ProductController::class);
 
-    // --- MODULE: TRANSACTIONS ---
-    Route::get('/transactions', [TransactionController::class, 'index'])->name('transactions.index');
-    Route::get('/transactions/create', [TransactionController::class, 'create'])->name('transactions.create');
-    Route::post('/transactions', [TransactionController::class, 'store'])->name('transactions.store');
 
-    // --- MODULE: SETTINGS (General, Utility, Warehouse View) ---
-    // Semua route di sini akan punya prefix URL '/settings/...'
+    // =========================================================================
+    // 3. TRANSACTIONS (Inbound / Outbound)
+    // =========================================================================
+    Route::prefix('transactions')->name('transactions.')->group(function () {
+        Route::get('/', [TransactionController::class, 'index'])->name('index');
+        Route::get('/create', [TransactionController::class, 'create'])->name('create');
+        Route::post('/', [TransactionController::class, 'store'])->name('store');
+    });
+
+
+    // =========================================================================
+    // 4. SETTINGS GROUP (Semua menu di sidebar 'Settings')
+    // =========================================================================
     Route::prefix('settings')->name('settings.')->group(function () {
         
-        // 1. Gudang (Tampilan List masuk ke menu Settings)
-        // URL: /settings/warehouses | Name: settings.warehouses.index
+        // A. MANAJEMEN USER (RBAC)
+        Route::resource('users', UserController::class)->except(['create', 'show', 'edit']);
+
+        // B. GUDANG (Tampilan View di Menu Settings)
+        // URL: /settings/warehouses -> Name: settings.warehouses.index
         Route::get('/warehouses', [SettingController::class, 'warehouseIndex'])->name('warehouses.index');
 
-        // 2. Attributes (Category & Unit)
+        // C. MATERIAL CREATION (Tampilan View)
+        Route::get('/materials', [SettingController::class, 'materialCreate'])->name('materials.create');
+
+        // D. ATTRIBUTES (Page Unit & Kategori)
         Route::get('/attributes', [AttributeController::class, 'index'])->name('attributes.index');
+
+        // --- AKSI CRUD UNTUK ATRIBUT (Dipanggil via Modal di page Attributes) ---
         
-        // Aksi Simpan/Hapus Kategori & Unit
+        // Units
         Route::post('/units', [AttributeController::class, 'storeUnit'])->name('units.store');
         Route::put('/units/{unit}', [AttributeController::class, 'updateUnit'])->name('units.update');
         Route::delete('/units/{unit}', [AttributeController::class, 'destroyUnit'])->name('units.destroy');
 
-        // CRUD Kategori
+        // Categories (Menggunakan AttributeController sesuai logika page Attributes)
         Route::post('/categories', [AttributeController::class, 'storeCategory'])->name('categories.store');
         Route::put('/categories/{category}', [AttributeController::class, 'updateCategory'])->name('categories.update');
         Route::delete('/categories/{category}', [AttributeController::class, 'destroyCategory'])->name('categories.destroy');
+    });
 
-        // 3. Users
-        Route::resource('users', \App\Http\Controllers\UserController::class)->except(['create', 'show', 'edit']);
+
+    // =========================================================================
+    // 5. ROOT RESOURCES (Action Handlers)
+    // =========================================================================
     
-        // 4. Material Creation
-        Route::get('/materials', [SettingController::class, 'materialCreate'])->name('materials.create');
-        
-        // 5. Manajemen Kategori
-        Route::resource('categories', CategoryController::class)->except(['show', 'create', 'edit']);
-        });
-
-    // --- LOGIC CRUD GUDANG (Tanpa Tampilan) ---
-    // Kita taruh di luar group settings agar nama routenya tetap standar 'warehouses.store', 'warehouses.update'
-    // Ini memudahkan agar kita tidak perlu mengubah form React yang sudah ada.
+    // GUDANG (CRUD Action)
+    // Ditaruh di luar group 'settings' agar nama rutenya tetap standar 'warehouses.store', 
+    // sehingga kita tidak perlu mengubah form React yang sudah ada.
     Route::resource('warehouses', WarehouseController::class)->except(['index', 'create', 'edit', 'show']);
 
 });
