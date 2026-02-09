@@ -63,7 +63,7 @@ export default function AuthenticatedLayout({ user, header, children }) {
                                 <div className="bg-indigo-600 p-1.5 rounded-lg">
                                     <Package className="w-6 h-6 text-white" />
                                 </div>
-                                <span className="font-bold text-xl tracking-tight text-slate-800">WMS<span className="text-indigo-600">Pro</span></span>
+                                <span className="font-bold text-xl tracking-tight text-slate-800">WM<span className="text-indigo-600">Skd</span></span>
                             </Link>
 
                             <div className="hidden sm:flex sm:space-x-4">

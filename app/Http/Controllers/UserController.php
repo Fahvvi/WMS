@@ -30,17 +30,19 @@ class UserController extends Controller
         ]);
     }
 
-    public function store(Request $request)
+   public function store(Request $request)
     {
         $request->validate([
             'name' => 'required|string|max:255',
+            'nip' => 'required|string|max:20|unique:users', // Validasi NIP Unik
             'email' => 'required|string|email|max:255|unique:users',
-            'role' => 'required|in:staff,spv,superadmin', // Validasi Role
-            'password' => ['required', 'confirmed', Rules\Password::defaults()],
+            'role' => 'required|in:staff,spv,superadmin',
+            'password' => ['required', 'confirmed', \Illuminate\Validation\Rules\Password::defaults()],
         ]);
 
         User::create([
             'name' => $request->name,
+            'nip' => $request->nip, // Input langsung ke tabel users
             'email' => $request->email,
             'role' => $request->role,
             'password' => Hash::make($request->password),
@@ -53,18 +55,20 @@ class UserController extends Controller
     {
         $request->validate([
             'name' => 'required|string|max:255',
+            // Ignore NIP milik user ini saat update agar tidak dianggap duplikat
+            'nip' => 'required|string|max:20|unique:users,nip,' . $user->id, 
             'email' => 'required|string|email|max:255|unique:users,email,' . $user->id,
             'role' => 'required|in:staff,spv,superadmin',
-            'password' => ['nullable', 'confirmed', Rules\Password::defaults()],
+            'password' => ['nullable', 'confirmed', \Illuminate\Validation\Rules\Password::defaults()],
         ]);
 
         $data = [
             'name' => $request->name,
+            'nip' => $request->nip,
             'email' => $request->email,
             'role' => $request->role,
         ];
 
-        // Hanya update password jika form password diisi
         if ($request->filled('password')) {
             $data['password'] = Hash::make($request->password);
         }

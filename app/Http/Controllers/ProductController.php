@@ -14,24 +14,22 @@ class ProductController extends Controller
 {
     public function index(Request $request)
     {
-        $query = $request->input('search');
+        $query = Product::query();
 
-        $products = Product::query()
-            ->withSum('stocks', 'quantity')
-            ->when($query, function ($q) use ($query) {
-                $q->where('name', 'ilike', "%{$query}%")
-                  ->orWhere('sku', 'ilike', "%{$query}%")
-                  ->orWhere('barcode', 'ilike', "%{$query}%");
-            })
+        if ($request->search) {
+            $query->where('name', 'ilike', "%{$request->search}%")
+                  ->orWhere('sku', 'ilike', "%{$request->search}%");
+        }
+
+        // UPDATE DI SINI: Tambahkan with('stocks.warehouse')
+        $products = $query->with(['stocks.warehouse']) 
             ->orderBy('created_at', 'desc')
             ->paginate(10)
             ->withQueryString();
 
-        return Inertia::render('Inventory/Index', [
+        return Inertia::render('Product/Index', [
             'products' => $products,
             'filters' => $request->only(['search']),
-            'categories' => Category::orderBy('name')->pluck('name'),
-            'units' => Unit::orderBy('name')->pluck('name'),
         ]);
     }
 

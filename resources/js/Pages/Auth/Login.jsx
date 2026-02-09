@@ -5,7 +5,7 @@ import InputLabel from '@/Components/InputLabel';
 import PrimaryButton from '@/Components/PrimaryButton';
 import TextInput from '@/Components/TextInput';
 import { Head, Link, useForm } from '@inertiajs/react';
-import { Package, Mail, Lock, ArrowRight, Warehouse } from 'lucide-react';
+import { Package, Mail, Lock, ArrowRight, Warehouse, IdCard } from 'lucide-react';
 
 export default function Login({ status, canResetPassword }) {
     const { data, setData, post, processing, errors, reset } = useForm({
@@ -86,29 +86,34 @@ export default function Login({ status, canResetPassword }) {
 
                     <div className="mb-8 text-center lg:text-left">
                         <h2 className="text-3xl font-bold text-slate-900">Selamat Datang!</h2>
-                        <p className="text-slate-500 mt-2">Silakan login untuk mengakses dashboard.</p>
+                        <p className="text-slate-500 mt-2">Silakan login menggunakan Email atau NIP Anda.</p>
                     </div>
 
                     {status && <div className="mb-4 font-medium text-sm text-green-600 bg-green-50 p-3 rounded-lg border border-green-200">{status}</div>}
 
                     <form onSubmit={submit} className="space-y-6">
-                        {/* Email Input */}
+                        {/* Email / NIP Input */}
                         <div>
-                            <InputLabel htmlFor="email" value="Email Perusahaan" />
+                            <InputLabel htmlFor="email" value="Email atau NIP" />
                             <div className="relative mt-1">
                                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <Mail className="h-5 w-5 text-slate-400" />
+                                    {/* Icon berubah tergantung isi input (visual only) */}
+                                    {data.email.includes('@') ? (
+                                        <Mail className="h-5 w-5 text-slate-400 transition-all" />
+                                    ) : (
+                                        <IdCard className="h-5 w-5 text-slate-400 transition-all" />
+                                    )}
                                 </div>
                                 <TextInput
                                     id="email"
-                                    type="email"
+                                    type="text" // GANTI KE TEXT AGAR BISA INPUT NIP
                                     name="email"
                                     value={data.email}
                                     className="pl-10 block w-full py-3 border-slate-200 focus:border-indigo-500 focus:ring-indigo-500 rounded-xl shadow-sm transition-all"
                                     autoComplete="username"
                                     isFocused={true}
                                     onChange={(e) => setData('email', e.target.value)}
-                                    placeholder="nama@perusahaan.com"
+                                    placeholder="nama@perusahaan.com atau NIP"
                                 />
                             </div>
                             <InputError message={errors.email} className="mt-2" />
