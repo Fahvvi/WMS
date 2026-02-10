@@ -22,8 +22,8 @@ class RoleController extends Controller
         // LOGIC GROUPING: Kelompokkan permission berdasarkan modulnya
         // Contoh: 'view_products' -> masuk grup 'Products'
         $groupedPermissions = $allPermissions->groupBy(function ($perm) {
-            $parts = explode('_', $perm->name); // pisah 'view_products'
-            return count($parts) > 1 ? \Str::title($parts[1]) : 'Other'; // ambil 'Products'
+            $parts = explode('_', $perm->name);
+            return strtoupper($parts[0]); // Ambil kata pertama & huruf besar (VIEW, CREATE, MANAGE)
         });
 
         return Inertia::render('Settings/Role/Index', [

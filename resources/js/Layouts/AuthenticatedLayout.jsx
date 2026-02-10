@@ -11,31 +11,30 @@ export default function AuthenticatedLayout({ user, header, children }) {
     const [showInventoryMenu, setShowInventoryMenu] = useState(false);
     const inventoryTimeoutRef = useRef(null);
 
-    // --- LOGIC PERMISSION ---
     const { props } = usePage(); 
     
-    // 1. Ambil Permissions dari Props Inertia
+    // --- 1. AMBIL PERMISSION & ROLE (URUTAN WAJIB DI ATAS) ---
     const permissions = props.auth?.permissions || []; 
 
-    // 2. Deteksi Role & Super Admin
+    // Deteksi Role (Support Spatie & Legacy Column)
     const userRoles = user.roles ? user.roles.map(r => r.name) : []; 
     if (user.role) userRoles.push(user.role); 
     
-    // Cek Super Admin (Case Insensitive)
+    // Cek apakah Super Admin? (Case insensitive)
     const isSuperAdmin = userRoles.some(r => r.toLowerCase().includes('admin'));
 
-    // 3. Helper Cek Izin (Bypass jika Super Admin)
+    // --- 2. HELPER CEK IZIN (SETELAH ROLE DIDEFINISIKAN) ---
     const hasPermission = (name) => {
-        if (isSuperAdmin) return true; 
+        if (isSuperAdmin) return true; // Bypass untuk Super Admin
         return permissions.includes(name);
     };
 
-    // --- DEFINISI AKSES MENU ---
-    // Logika OR (||) digunakan agar support kedua jenis penamaan (dengan/tanpa prefix view_)
+    // --- 3. DEFINISI AKSES MENU (SETELAH HELPER DIDEFINISIKAN) ---
+    // Logika OR (||) agar support nama 'dashboard' ATAU 'view_dashboard'
     
     const canViewDashboard = hasPermission('dashboard') || hasPermission('view_dashboard');
     
-    // Transaksi Inbound & Outbound
+    // Transaksi (Inbound & Outbound)
     const canViewInbound = hasPermission('inbound') || hasPermission('view_inbound');
     const canViewOutbound = hasPermission('outbound') || hasPermission('view_outbound');
     
@@ -47,10 +46,10 @@ export default function AuthenticatedLayout({ user, header, children }) {
     // Settings
     const canViewSettings = hasPermission('settings') || hasPermission('view_settings');
 
-    // Group Logic: Inventory muncul jika salah satu anaknya boleh dilihat
+    // Group Logic
     const canViewInventoryGroup = canViewProducts || canViewStockTransfers || canViewStockOpname;
 
-    // --- FLASH MESSAGE LISTENER ---
+    // --- FLASH MESSAGE ---
     const flash = props.flash || {};
 
     useEffect(() => {
@@ -62,7 +61,6 @@ export default function AuthenticatedLayout({ user, header, children }) {
         }
     }, [flash]);
     
-    // Logic Hover Dropdown
     const handleMouseEnter = () => {
         if (inventoryTimeoutRef.current) clearTimeout(inventoryTimeoutRef.current);
         setShowInventoryMenu(true);

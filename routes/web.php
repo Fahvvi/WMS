@@ -61,20 +61,20 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // B. PRODUCTS (Master Data Barang)
     // Note: Route custom (check/print) HARUS diletakkan SEBELUM Route::resource
-    Route::prefix('products')->name('products.')->group(function () {
+    Route::prefix('products')->name('products.')->middleware(['permission:view_products'])->group(function () {
         Route::get('/check', [ProductController::class, 'check'])->name('check'); // Cek barcode
         Route::get('/{product}/print', [ProductController::class, 'printLabel'])->name('print');
         Route::get('/{product}/history', [ProductController::class, 'history'])->name('history');
     });
     
     // Resource Produk (index, store, update, destroy)
-    Route::resource('products', ProductController::class);
+    Route::resource('products', ProductController::class)->middleware(['permission:view_products']);
 
 
     // =========================================================================
     // 3. TRANSACTIONS (Inbound / Outbound)
     // =========================================================================
-    Route::prefix('transactions')->name('transactions.')->group(function () {
+    Route::prefix('transactions')->name('transactions.')->middleware(['auth'])->group(function () {
         Route::get('/', [TransactionController::class, 'index'])->name('index');
         Route::get('/create', [TransactionController::class, 'create'])->name('create');
         Route::post('/', [TransactionController::class, 'store'])->name('store');

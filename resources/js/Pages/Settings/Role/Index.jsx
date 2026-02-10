@@ -1,6 +1,6 @@
 import SettingsLayout from '@/Layouts/SettingsLayout';
 import { Head, useForm, router } from '@inertiajs/react';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { 
     Shield, Plus, Edit, Trash2, X, Save, CheckCircle2, Lock 
 } from 'lucide-react';
@@ -14,10 +14,9 @@ export default function RoleIndex({ roles, groupedPermissions }) {
     const [isEditMode, setIsEditMode] = useState(false);
     const [editingRole, setEditingRole] = useState(null);
 
-    // Form State
     const { data, setData, post, put, delete: destroy, processing, errors, reset, clearErrors } = useForm({
         name: '',
-        permissions: [] // Array string permission name
+        permissions: [] 
     });
 
     const openCreateModal = () => {
@@ -37,7 +36,6 @@ export default function RoleIndex({ roles, groupedPermissions }) {
         setEditingRole(role);
         setData({
             name: role.name,
-            // Map permission object ke array of names
             permissions: role.permissions.map(p => p.name) 
         });
         clearErrors();
@@ -58,7 +56,7 @@ export default function RoleIndex({ roles, groupedPermissions }) {
         
         Swal.fire({
             title: 'Hapus Role?',
-            text: `Role "${role.name}" akan dihapus. User dengan role ini akan kehilangan akses.`,
+            text: `Role "${role.name}" akan dihapus. User terkait akan kehilangan akses.`,
             icon: 'warning',
             showCancelButton: true,
             confirmButtonColor: '#ef4444',
@@ -70,7 +68,6 @@ export default function RoleIndex({ roles, groupedPermissions }) {
         });
     };
 
-    // Helper untuk handle checkbox permission
     const togglePermission = (permName) => {
         const currentPerms = [...data.permissions];
         if (currentPerms.includes(permName)) {
@@ -80,29 +77,37 @@ export default function RoleIndex({ roles, groupedPermissions }) {
         }
     };
 
-    // Helper Select All per Group
     const toggleGroup = (groupName, permsInGroup) => {
         const allNames = permsInGroup.map(p => p.name);
         const currentPerms = [...data.permissions];
-        
-        // Cek apakah semua di grup ini sudah terpilih?
         const isAllSelected = allNames.every(name => currentPerms.includes(name));
 
         if (isAllSelected) {
-            // Unselect All
             setData('permissions', currentPerms.filter(name => !allNames.includes(name)));
         } else {
-            // Select All (tambahkan yang belum ada)
             const newPerms = [...new Set([...currentPerms, ...allNames])];
             setData('permissions', newPerms);
         }
     };
 
+    // Helper formatter nama permission agar cantik di UI
+    const formatPermissionName = (name, groupName) => {
+        // Hapus nama grup dari permission biar tidak redundant (e.g. "view_products" -> "view")
+        // Dan ganti underscore dengan spasi
+        let cleanName = name.replace(/_/g, ' ');
+        const groupLower = groupName.toLowerCase();
+        
+        if (cleanName.includes(groupLower)) {
+            cleanName = cleanName.replace(groupLower, '').trim();
+        }
+        
+        // Jika hasil kosong atau cuma spasi (kasus namanya sama persis grup), kembalikan nama asli
+        return cleanName || name.replace(/_/g, ' ');
+    };
+
     return (
         <SettingsLayout title="Manajemen Role & Akses">
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                
-                {/* Header */}
                 <div className="p-6 border-b border-slate-200 flex justify-between items-center">
                     <div>
                         <h2 className="text-lg font-bold text-slate-800">Daftar Role (Jabatan)</h2>
@@ -113,7 +118,6 @@ export default function RoleIndex({ roles, groupedPermissions }) {
                     </button>
                 </div>
 
-                {/* Table */}
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm text-left text-slate-600">
                         <thead className="text-xs text-slate-700 uppercase bg-slate-50 border-b border-slate-200">
@@ -134,8 +138,8 @@ export default function RoleIndex({ roles, groupedPermissions }) {
                                         <div className="flex flex-wrap gap-1">
                                             {role.permissions.length > 0 ? (
                                                 role.permissions.slice(0, 5).map(p => (
-                                                    <span key={p.id} className="text-[10px] px-2 py-0.5 bg-slate-100 text-slate-600 rounded border border-slate-200">
-                                                        {p.name.replace('_', ' ')}
+                                                    <span key={p.id} className="text-[10px] px-2 py-0.5 bg-slate-100 text-slate-600 rounded border border-slate-200 capitalize">
+                                                        {p.name.replace(/_/g, ' ')}
                                                     </span>
                                                 ))
                                             ) : (
@@ -163,12 +167,9 @@ export default function RoleIndex({ roles, groupedPermissions }) {
                 </div>
             </div>
 
-            {/* --- MODAL FORM --- */}
             {isModalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden border border-slate-200 animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
-                        
-                        {/* Header */}
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl overflow-hidden border border-slate-200 animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
                         <div className="bg-white px-6 py-4 border-b border-slate-100 flex justify-between items-center shrink-0">
                             <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2">
                                 <Shield className="w-5 h-5 text-indigo-600" />
@@ -177,11 +178,8 @@ export default function RoleIndex({ roles, groupedPermissions }) {
                             <button onClick={() => setIsModalOpen(false)} className="p-1 rounded-full hover:bg-slate-100 transition"><X className="w-5 h-5 text-slate-500" /></button>
                         </div>
 
-                        {/* Scrollable Body */}
                         <div className="p-6 overflow-y-auto">
                             <form id="roleForm" onSubmit={handleSubmit} className="space-y-6">
-                                
-                                {/* Nama Role */}
                                 <div>
                                     <InputLabel value="Nama Jabatan / Role" />
                                     <TextInput 
@@ -196,38 +194,33 @@ export default function RoleIndex({ roles, groupedPermissions }) {
 
                                 <hr className="border-slate-100" />
 
-                                {/* MATRIX PERMISSION */}
                                 <div>
                                     <h4 className="text-sm font-bold text-slate-700 mb-4">Atur Hak Akses (Permissions)</h4>
                                     
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                         {Object.keys(groupedPermissions).map((groupName) => (
-                                            <div key={groupName} className="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden">
-                                                {/* Group Header */}
+                                            <div key={groupName} className="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition">
                                                 <div className="bg-slate-100 px-4 py-2 border-b border-slate-200 flex justify-between items-center">
-                                                    <span className="font-bold text-xs text-slate-600 uppercase tracking-wide">{groupName}</span>
+                                                    <span className="font-bold text-xs text-slate-700 uppercase tracking-wide">{groupName}</span>
                                                     <button 
                                                         type="button"
                                                         onClick={() => toggleGroup(groupName, groupedPermissions[groupName])}
-                                                        className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800"
+                                                        className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 hover:underline"
                                                     >
                                                         Pilih Semua
                                                     </button>
                                                 </div>
-                                                
-                                                {/* Checkboxes */}
                                                 <div className="p-3 space-y-2">
                                                     {groupedPermissions[groupName].map((perm) => (
-                                                        <label key={perm.id} className="flex items-start gap-3 cursor-pointer group">
+                                                        <label key={perm.id} className="flex items-center gap-3 cursor-pointer group hover:bg-white p-1 rounded transition">
                                                             <input 
                                                                 type="checkbox" 
-                                                                className="mt-0.5 rounded border-slate-300 text-indigo-600 shadow-sm focus:ring-indigo-500 cursor-pointer"
+                                                                className="rounded border-slate-300 text-indigo-600 shadow-sm focus:ring-indigo-500 cursor-pointer"
                                                                 checked={data.permissions.includes(perm.name)}
                                                                 onChange={() => togglePermission(perm.name)}
                                                             />
-                                                            <span className="text-sm text-slate-600 group-hover:text-slate-900 transition select-none">
-                                                                {perm.name.replace(/_/g, ' ').replace(groupName.toLowerCase(), '')} 
-                                                                {/* (Opsional: Bersihkan nama permission agar lebih enak dibaca) */}
+                                                            <span className="text-sm text-slate-600 group-hover:text-slate-900 transition capitalize select-none">
+                                                                {formatPermissionName(perm.name, groupName)}
                                                             </span>
                                                         </label>
                                                     ))}
@@ -236,18 +229,15 @@ export default function RoleIndex({ roles, groupedPermissions }) {
                                         ))}
                                     </div>
                                 </div>
-
                             </form>
                         </div>
 
-                        {/* Footer */}
                         <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex justify-end gap-3 shrink-0">
                             <button onClick={() => setIsModalOpen(false)} className="px-5 py-2.5 text-slate-600 font-bold text-sm hover:bg-slate-200 rounded-xl transition">Batal</button>
                             <button type="submit" form="roleForm" disabled={processing} className="px-6 py-2.5 bg-indigo-600 text-white rounded-xl font-bold text-sm shadow-lg shadow-indigo-200 flex items-center gap-2 hover:bg-indigo-700 transition">
                                 <Save className="w-4 h-4" /> Simpan Role
                             </button>
                         </div>
-
                     </div>
                 </div>
             )}
