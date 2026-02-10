@@ -33,6 +33,14 @@ class HandleInertiaRequests extends Middleware
             ...parent::share($request),
             'auth' => [
                 'user' => $request->user(),
+                // PENTING: Kirim array permission name ke frontend
+                'permissions' => $request->user() 
+                    ? $request->user()->getAllPermissions()->pluck('name') 
+                    : [],
+            ],
+            'flash' => [
+                'success' => fn () => $request->session()->get('success'),
+                'error' => fn () => $request->session()->get('error'),
             ],
         ];
     }

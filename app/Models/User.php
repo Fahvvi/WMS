@@ -6,12 +6,13 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Spatie\Permission\Traits\HasRoles; // <--- PENTING 1: Import Library
+use Spatie\Permission\Traits\HasRoles;
+use Laravel\Sanctum\HasApiTokens; // <--- PENTING 1: Import Library
 
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable, HasRoles; // <--- PENTING 2: Pasang Trait di sini
+    use HasFactory, HasApiTokens, Notifiable, HasRoles; // <--- PENTING 2: Pasang Trait di sini
 
     /**
      * The attributes that are mass assignable.

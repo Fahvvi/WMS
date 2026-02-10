@@ -84,11 +84,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // =========================================================================
     // 4. SETTINGS GROUP (Semua menu di sidebar 'Settings')
     // =========================================================================
-    Route::prefix('settings')->name('settings.')->group(function () {
+    Route::prefix('settings')->name('settings.')->middleware(['role:Super Admin|Supervisor'])->group(function () {
         
         // A. MANAJEMEN USER (RBAC)
-        Route::resource('users', UserController::class)->except(['create', 'show', 'edit']);
-
+        Route::resource('users', UserController::class)
+            ->middleware(['role:Super Admin']);
         // B. GUDANG (Tampilan View di Menu Settings)
         // URL: /settings/warehouses -> Name: settings.warehouses.index
         Route::get('/warehouses', [SettingController::class, 'warehouseIndex'])->name('warehouses.index');
@@ -99,6 +99,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // D. ATTRIBUTES (Page Unit & Kategori)
         Route::get('/attributes', [AttributeController::class, 'index'])->name('attributes.index');
 
+        // E. Roles
+       Route::resource('roles', \App\Http\Controllers\RoleController::class)
+            ->except(['create', 'show', 'edit'])
+            ->middleware(['role:Super Admin']);
         // --- AKSI CRUD UNTUK ATRIBUT (Dipanggil via Modal di page Attributes) ---
         
         // Units
