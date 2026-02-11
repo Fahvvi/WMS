@@ -7,10 +7,10 @@ use Illuminate\Database\Seeder;
 class DatabaseSeeder extends Seeder
 {
     public function run(): void
-    {
-        $this->call([
-            PermissionSeeder::class, // Panggil ini DULUAN
-            WmsSeeder::class,        // Baru data user/barang
-        ]);
-    }
+{
+    $this->call([
+        PermissionSeeder::class, // <--- PENTING: Harus paling atas
+        WmsSeeder::class,        // Seeder user/dummy data
+    ]);
+}
 }

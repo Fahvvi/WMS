@@ -39,7 +39,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // =========================================================================
     // 1. DASHBOARD & PROFILE
     // =========================================================================
-    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/dashboard', [DashboardController::class, 'index'])
+        ->name('dashboard')
+        ->middleware(['permission:view_dashboard']);
 
     Route::prefix('profile')->name('profile.')->group(function () {
         Route::get('/', [ProfileController::class, 'edit'])->name('edit');
@@ -127,5 +129,61 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::resource('warehouses', WarehouseController::class)->except(['index', 'create', 'edit', 'show']);
 
 });
+
+// // --- ROUTE DARURAT: PEMBERSIH DATABASE (HAPUS SETELAH DIPAKAI) ---
+// Route::get('/fix-database-now', function () {
+//     try {
+//         \Illuminate\Support\Facades\DB::transaction(function () {
+//             // 1. HAPUS BERSIH SEMUA DATA (Mode PostgreSQL: CASCADE)
+//             // Urutan tabel sangat penting!
+//             $tables = ['role_has_permissions', 'model_has_roles', 'model_has_permissions', 'permissions', 'roles'];
+//             foreach($tables as $table) {
+//                 \Illuminate\Support\Facades\DB::statement("TRUNCATE TABLE $table RESTART IDENTITY CASCADE");
+//             }
+            
+//             // 2. BUAT PERMISSION STANDAR (Format: view_noun)
+//             $perms = [
+//                 // Dashboard
+//                 'view_dashboard',
+//                 // Transaksi
+//                 'view_inbound', 'create_inbound',
+//                 'view_outbound', 'create_outbound',
+//                 // Inventory
+//                 'view_products', 'create_products', 'edit_products', 'delete_products',
+//                 'view_transfers', 'create_transfers', 'approve_transfers',
+//                 'view_stock_opname',
+//                 // Settings
+//                 'view_settings',
+//                 'manage_users', 'manage_roles', 'manage_warehouses', 'manage_categories'
+//             ];
+
+//             foreach ($perms as $p) {
+//                 \Spatie\Permission\Models\Permission::create(['name' => $p]);
+//             }
+
+//             // 3. SETTING ROLE ULANG
+//             $roleSuper = \Spatie\Permission\Models\Role::create(['name' => 'Super Admin']);
+//             $roleSuper->syncPermissions(\Spatie\Permission\Models\Permission::all());
+
+//             $roleStaff = \Spatie\Permission\Models\Role::create(['name' => 'Staff']);
+//             $roleStaff->syncPermissions([
+//                 'view_dashboard', 'view_inbound', 'create_inbound', 
+//                 'view_outbound', 'create_outbound', 'view_products', 
+//                 'view_transfers', 'create_transfers'
+//             ]);
+
+//             // 4. FIX USER (Hubungkan User Anda ke Role)
+//             $admin = \App\Models\User::where('email', 'like', '%superadmin%')->first();
+//             if($admin) { $admin->assignRole('Super Admin'); $admin->role='Super Admin'; $admin->save(); }
+
+//             $fahmi = \App\Models\User::where('email', 'like', '%fahmi%')->first();
+//             if($fahmi) { $fahmi->assignRole('Staff'); $fahmi->role='Staff'; $fahmi->save(); }
+//         });
+
+//         return "<h1 style='color:green; text-align:center; margin-top:50px;'>SUKSES! Database Telah Dibersihkan & Dirapikan.</h1>";
+//     } catch (\Exception $e) {
+//         return "<h1 style='color:red;'>ERROR: " . $e->getMessage() . "</h1>";
+//     }
+// });
 
 require __DIR__.'/auth.php';

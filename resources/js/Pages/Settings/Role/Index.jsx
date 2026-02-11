@@ -219,8 +219,9 @@ export default function RoleIndex({ roles, groupedPermissions }) {
                                                                 checked={data.permissions.includes(perm.name)}
                                                                 onChange={() => togglePermission(perm.name)}
                                                             />
+                                                            {/* LOGIC LABEL BARU: Hapus prefix group dari nama permission */}
                                                             <span className="text-sm text-slate-600 group-hover:text-slate-900 transition capitalize select-none">
-                                                                {formatPermissionName(perm.name, groupName)}
+                                                                {perm.name.replace(groupName.toLowerCase() + '_', '').replace(/_/g, ' ')}
                                                             </span>
                                                         </label>
                                                     ))}

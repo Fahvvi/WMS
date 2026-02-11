@@ -13,22 +13,19 @@ class RoleController extends Controller
 {
     public function index()
     {
-        // Ambil semua Role beserta permission-nya
         $roles = Role::with('permissions')->orderBy('id')->get();
-
-        // Ambil semua Permission untuk pilihan di form
         $allPermissions = Permission::all();
 
-        // LOGIC GROUPING: Kelompokkan permission berdasarkan modulnya
-        // Contoh: 'view_products' -> masuk grup 'Products'
+        // UBAH LOGIC DISINI: Grouping by PREFIX (Kata Depan)
+        // Hasilnya: Group 'VIEW', Group 'CREATE', Group 'MANAGE'
         $groupedPermissions = $allPermissions->groupBy(function ($perm) {
             $parts = explode('_', $perm->name);
-            return strtoupper($parts[0]); // Ambil kata pertama & huruf besar (VIEW, CREATE, MANAGE)
+            return strtoupper($parts[0]); // Ambil kata pertama & Huruf Besar
         });
 
         return Inertia::render('Settings/Role/Index', [
             'roles' => $roles,
-            'groupedPermissions' => $groupedPermissions, // Kirim data yang sudah digrup
+            'groupedPermissions' => $groupedPermissions,
         ]);
     }
 

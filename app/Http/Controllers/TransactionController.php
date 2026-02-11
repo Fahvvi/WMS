@@ -7,7 +7,7 @@ use App\Models\Stock;
 use App\Models\Transaction;
 use App\Models\TransactionDetail;
 use App\Models\Warehouse;
-use App\Models\Unit; // <--- Penting: Import Model Unit
+use App\Models\Unit; 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -21,10 +21,21 @@ class TransactionController extends Controller
         $type = $request->input('type', 'inbound');
         $query = $request->input('search');
 
+        // --- SECURITY CHECK (CEGAH AKSES URL LANGSUNG) ---
+        // Jika user memaksa ganti URL ?type=outbound padahal tidak punya izin, kita tolak.
+        if ($type === 'inbound') {
+            if (!auth()->user()->can('view_inbound')) {
+                abort(403, 'ANDA TIDAK MEMILIKI AKSES KE HALAMAN INBOUND.');
+            }
+        } elseif ($type === 'outbound') {
+            if (!auth()->user()->can('view_outbound')) {
+                abort(403, 'ANDA TIDAK MEMILIKI AKSES KE HALAMAN OUTBOUND.');
+            }
+        }
+        // ------------------------------------------------
+
         $transactions = Transaction::with(['user', 'warehouse'])
-            // TAMBAHAN 1: Ambil detail produk untuk cek Kategori nanti
             ->with(['details.product']) 
-            // TAMBAHAN 2: Hitung otomatis total quantity dari tabel details
             ->withSum('details', 'quantity') 
             ->where('type', $type)
             ->when($query, function ($q) use ($query) {
@@ -45,23 +56,32 @@ class TransactionController extends Controller
     {
         $type = $request->query('type', 'inbound'); 
 
-        // 1. LOGIC FIX: Generate Nomor Transaksi 'TRX-YYYYMMDD-XXXX'
+        // --- SECURITY CHECK (CEGAH AKSES FORM) ---
+        if ($type === 'inbound') {
+            if (!auth()->user()->can('create_inbound')) {
+                abort(403, 'ANDA TIDAK BERHAK MEMBUAT TRANSAKSI INBOUND.');
+            }
+        } elseif ($type === 'outbound') {
+            if (!auth()->user()->can('create_outbound')) {
+                abort(403, 'ANDA TIDAK BERHAK MEMBUAT TRANSAKSI OUTBOUND.');
+            }
+        }
+        // -----------------------------------------
+
+        // Logic Generate Nomor Transaksi 'TRX-YYYYMMDD-XXXX'
         $today = date('Ymd');
-        $prefix = 'TRX-' . $today . '-'; // Format Prefix seragam
+        $prefix = 'TRX-' . $today . '-'; 
         
-        // Cari nomor terakhir hari ini yang depannya TRX-YYYYMMDD-
         $lastTrx = Transaction::where('trx_number', 'like', $prefix . '%')
             ->orderByRaw("CAST(SUBSTRING(trx_number FROM " . (strlen($prefix) + 1) . ") AS INTEGER) DESC")
             ->first();
 
         $nextNumber = 1;
         if ($lastTrx) {
-            // Ambil 4 digit terakhir
             $lastNumber = intval(substr($lastTrx->trx_number, -4));
             $nextNumber = $lastNumber + 1;
         }
 
-        // Hasil: TRX-20260206-0001
         $newTrxNumber = $prefix . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
 
         return Inertia::render('Transaction/Create', [
@@ -75,6 +95,7 @@ class TransactionController extends Controller
 
     public function store(Request $request)
     {
+        // Validasi Input
         $request->validate([
             'type' => 'required|in:inbound,outbound',
             'trx_number' => 'required|string|unique:transactions,trx_number',
@@ -85,22 +106,29 @@ class TransactionController extends Controller
             'items.*.quantity' => 'required|integer|min:1',
         ]);
 
+        // --- SECURITY CHECK (BACKEND VALIDATION) ---
+        // Mencegah manipulasi request via Inspect Element / Postman
+        if ($request->type === 'inbound' && !auth()->user()->can('create_inbound')) {
+            abort(403, 'TINDAKAN DITOLAK: TIDAK ADA IZIN CREATE INBOUND');
+        }
+        if ($request->type === 'outbound' && !auth()->user()->can('create_outbound')) {
+            abort(403, 'TINDAKAN DITOLAK: TIDAK ADA IZIN CREATE OUTBOUND');
+        }
+        // -------------------------------------------
+
         try {
             DB::beginTransaction();
 
-            // 2. LOGIC FIX: Validasi Stok untuk OUTBOUND
+            // Validasi Stok untuk OUTBOUND
             if ($request->type === 'outbound') {
                 foreach ($request->items as $item) {
-                    // Cek stok di GUDANG YANG DIPILIH
                     $currentStock = Stock::where('product_id', $item['product_id'])
                         ->where('warehouse_id', $request->warehouse_id)
-                        ->value('quantity'); // Ambil nilai quantity langsung
+                        ->value('quantity'); 
 
-                    $currentStock = $currentStock ?? 0; // Jika null, anggap 0
+                    $currentStock = $currentStock ?? 0;
 
-                    // Jika stok kurang, batalkan transaksi
                     if ($currentStock < $item['quantity']) {
-                        // Ambil nama produk untuk pesan error yang jelas
                         $productName = Product::find($item['product_id'])->name;
                         
                         throw ValidationException::withMessages([
@@ -110,7 +138,7 @@ class TransactionController extends Controller
                 }
             }
 
-            // 3. Simpan Header Transaksi
+            // Simpan Header Transaksi
             $transaction = Transaction::create([
                 'user_id' => auth()->id(),
                 'warehouse_id' => $request->warehouse_id,
@@ -121,7 +149,7 @@ class TransactionController extends Controller
                 'status' => 'completed', 
             ]);
 
-            // 4. Loop Items & Update Stock
+            // Loop Items & Update Stock
             foreach ($request->items as $item) {
                 
                 TransactionDetail::create([
@@ -138,7 +166,7 @@ class TransactionController extends Controller
                     );
                     $stock->increment('quantity', $item['quantity']);
                 } else {
-                    // Outbound: Kurangi Stok (Sudah divalidasi di atas, jadi aman)
+                    // Outbound: Kurangi Stok
                     Stock::where('product_id', $item['product_id'])
                         ->where('warehouse_id', $request->warehouse_id)
                         ->decrement('quantity', $item['quantity']);
@@ -152,7 +180,7 @@ class TransactionController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
-            // Lempar kembali error validasi agar muncul di form frontend
+            
             if ($e instanceof ValidationException) {
                 throw $e;
             }
