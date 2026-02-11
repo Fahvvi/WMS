@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Product;
 use App\Models\Stock;
 use App\Models\StockTransfer;
+use App\Models\StockTransferDetail;
 use App\Models\Warehouse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -13,49 +14,101 @@ use Illuminate\Validation\ValidationException;
 
 class StockTransferController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        // Tampilkan Riwayat Transfer
-        $transfers = StockTransfer::with(['product', 'fromWarehouse', 'toWarehouse', 'user'])
+        // --- SECURITY CHECK (VIEW) ---
+        if (!auth()->user()->can('view_transfers')) {
+            abort(403, 'ANDA TIDAK MEMILIKI AKSES KE HALAMAN TRANSFER STOK.');
+        }
+        // -----------------------------
+
+        $query = $request->input('search');
+
+        $transfers = StockTransfer::with(['fromWarehouse', 'toWarehouse', 'user'])
+            ->withCount('details') 
+            ->when($query, function ($q) use ($query) {
+                $q->where('transfer_number', 'ilike', "%{$query}%");
+            })
             ->latest()
-            ->paginate(10);
+            ->paginate(10)
+            ->withQueryString();
 
         return Inertia::render('StockTransfer/Index', [
-            'transfers' => $transfers
+            'transfers' => $transfers,
+            'filters' => $request->only(['search']),
         ]);
     }
 
     public function create()
     {
-        // Generate Nomor Transfer Otomatis (TRF-YYYYMMDD-XXXX)
+        // --- SECURITY CHECK (CREATE) ---
+        if (!auth()->user()->can('create_transfers')) {
+            abort(403, 'ANDA TIDAK BERHAK MEMBUAT TRANSFER STOK.');
+        }
+        // -------------------------------
+
+        // Generate Nomor Transfer Otomatis (TF-YYYYMMDD-XXXX)
         $today = date('Ymd');
-        $prefix = 'TRF-' . $today . '-';
+        $prefix = 'TF-' . $today . '-';
         
-        $lastTrf = StockTransfer::where('transfer_number', 'like', $prefix . '%')
-            ->orderByRaw("CAST(SUBSTRING(transfer_number FROM " . (strlen($prefix) + 1) . ") AS INTEGER) DESC")
+        $lastTransfer = StockTransfer::where('transfer_number', 'like', $prefix . '%')
+            ->orderBy('id', 'desc')
             ->first();
 
         $nextNumber = 1;
-        if ($lastTrf) {
-            $nextNumber = intval(substr($lastTrf->transfer_number, -4)) + 1;
+        if ($lastTransfer) {
+            $lastNumber = intval(substr($lastTransfer->transfer_number, -4));
+            $nextNumber = $lastNumber + 1;
         }
 
-        $newTrfNumber = $prefix . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
+        $newTransferNumber = $prefix . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
 
         return Inertia::render('StockTransfer/Create', [
-            'newTrfNumber' => $newTrfNumber,
-            'warehouses' => Warehouse::orderBy('name')->get(),
-            'products' => Product::select('id', 'name', 'sku', 'unit')->orderBy('name')->get(), // Untuk dropdown
+            'newTransferNumber' => $newTransferNumber,
+            'warehouses' => Warehouse::where('is_active', true)->orderBy('name')->get(),
+            'products' => Product::orderBy('name')->get() 
         ]);
+    }
+
+    // API Helper: Ambil stok barang di gudang asal
+    public function getWarehouseStocks(Warehouse $warehouse)
+    {
+        // --- SECURITY CHECK (API) ---
+        // Mencegah user iseng nembak API stok gudang lain
+        if (!auth()->user()->can('create_transfers')) {
+            abort(403, 'Unauthorized access to warehouse stocks.');
+        }
+        // ----------------------------
+
+        $stocks = Stock::with('product')
+            ->where('warehouse_id', $warehouse->id)
+            ->where('quantity', '>', 0)
+            ->get()
+            ->map(function ($stock) {
+                return [
+                    'product_id' => $stock->product_id,
+                    'name' => $stock->product->name,
+                    'sku' => $stock->product->sku,
+                    'quantity' => $stock->quantity
+                ];
+            });
+
+        return response()->json($stocks);
     }
 
     public function store(Request $request)
     {
+        // --- SECURITY CHECK (STORE) ---
+        if (!auth()->user()->can('create_transfers')) {
+            abort(403, 'TINDAKAN DITOLAK: TIDAK ADA IZIN CREATE TRANSFER');
+        }
+        // ------------------------------
+
         $request->validate([
             'transfer_number' => 'required|unique:stock_transfers,transfer_number',
             'transfer_date' => 'required|date',
             'from_warehouse_id' => 'required|exists:warehouses,id',
-            'to_warehouse_id' => 'required|exists:warehouses,id|different:from_warehouse_id', // Asal & Tujuan tidak boleh sama
+            'to_warehouse_id' => 'required|exists:warehouses,id|different:from_warehouse_id',
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|exists:products,id',
             'items.*.quantity' => 'required|integer|min:1',
@@ -64,69 +117,64 @@ class StockTransferController extends Controller
         try {
             DB::beginTransaction();
 
+            // 1. Validasi Stok Terlebih Dahulu (Double Check)
             foreach ($request->items as $item) {
-                // 1. Cek Stok di Gudang ASAL
-                $sourceStock = Stock::where('product_id', $item['product_id'])
-                    ->where('warehouse_id', $request->from_warehouse_id)
-                    ->first();
+                $currentStock = Stock::where('warehouse_id', $request->from_warehouse_id)
+                    ->where('product_id', $item['product_id'])
+                    ->value('quantity');
 
-                // Validasi Stok Cukup
-                if (!$sourceStock || $sourceStock->quantity < $item['quantity']) {
-                    $prodName = Product::find($item['product_id'])->name;
+                if (!$currentStock || $currentStock < $item['quantity']) {
+                    $productName = Product::find($item['product_id'])->name;
                     throw ValidationException::withMessages([
-                        'items' => "Stok '$prodName' di Gudang Asal tidak cukup. Sisa: " . ($sourceStock ? $sourceStock->quantity : 0)
+                        'items' => "Stok '$productName' tidak mencukupi di gudang asal. Sisa: " . ($currentStock ?? 0)
                     ]);
                 }
+            }
 
-                // 2. Catat Riwayat Transfer
-                StockTransfer::create([
-                    'transfer_number' => $request->transfer_number,
-                    'transfer_date' => $request->transfer_date,
-                    'user_id' => auth()->id(),
-                    'from_warehouse_id' => $request->from_warehouse_id,
-                    'to_warehouse_id' => $request->to_warehouse_id,
+            // 2. Buat Header Transfer
+            $transfer = StockTransfer::create([
+                'user_id' => auth()->id(),
+                'transfer_number' => $request->transfer_number,
+                'transfer_date' => $request->transfer_date,
+                'from_warehouse_id' => $request->from_warehouse_id,
+                'to_warehouse_id' => $request->to_warehouse_id,
+                'status' => 'completed', 
+                'notes' => $request->notes
+            ]);
+
+            // 3. Proses Item & Mutasi Stok
+            foreach ($request->items as $item) {
+                // Simpan Detail
+                StockTransferDetail::create([
+                    'stock_transfer_id' => $transfer->id,
                     'product_id' => $item['product_id'],
-                    'quantity' => $item['quantity'],
-                    'notes' => $request->notes,
+                    'quantity' => $item['quantity']
                 ]);
 
-                // 3. Update Stok (Kurangi Asal, Tambah Tujuan)
-                $sourceStock->decrement('quantity', $item['quantity']);
+                // Kurangi Stok Gudang ASAL
+                Stock::where('warehouse_id', $request->from_warehouse_id)
+                    ->where('product_id', $item['product_id'])
+                    ->decrement('quantity', $item['quantity']);
 
+                // Tambah Stok Gudang TUJUAN
                 $destStock = Stock::firstOrCreate(
-                    ['product_id' => $item['product_id'], 'warehouse_id' => $request->to_warehouse_id],
+                    ['warehouse_id' => $request->to_warehouse_id, 'product_id' => $item['product_id']],
                     ['quantity' => 0]
                 );
                 $destStock->increment('quantity', $item['quantity']);
             }
 
             DB::commit();
-            return redirect()->route('stock-transfers.index')->with('success', 'Transfer stok berhasil!');
+
+            return redirect()->route('stock-transfers.index')
+                ->with('success', 'Transfer stok berhasil diproses.');
 
         } catch (\Exception $e) {
             DB::rollBack();
-            if ($e instanceof ValidationException) throw $e;
-            return back()->withErrors(['error' => $e->getMessage()]);
+            if ($e instanceof ValidationException) {
+                throw $e;
+            }
+            return back()->withErrors(['error' => 'Gagal memproses transfer: ' . $e->getMessage()]);
         }
-    }
-
-    public function getWarehouseStocks(Request $request, $warehouseId)
-    {
-        // Ambil stok yang quantity > 0 di gudang tersebut
-        $stocks = \App\Models\Stock::where('warehouse_id', $warehouseId)
-            ->where('quantity', '>', 0)
-            ->with('product') // Load data produk (nama, sku, unit)
-            ->get()
-            ->map(function ($stock) {
-                return [
-                    'id' => $stock->product->id,
-                    'name' => $stock->product->name,
-                    'sku' => $stock->product->sku,
-                    'unit' => $stock->product->unit,
-                    'available_qty' => $stock->quantity // Kirim sisa stok agar bisa divalidasi di frontend
-                ];
-            });
-
-        return response()->json($stocks);
     }
 }
