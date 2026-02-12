@@ -9,6 +9,8 @@ use App\Http\Controllers\WarehouseController;
 use App\Http\Controllers\SettingController;
 use App\Http\Controllers\AttributeController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\CategoryController; 
+use App\Http\Controllers\RoleController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -70,7 +72,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
     
     // Resource Produk (index, store, update, destroy)
-    Route::resource('products', ProductController::class)->middleware(['permission:view_products']);
+    // Permission specific (create/edit/delete) handled inside Controller for better security
+    Route::resource('products', ProductController::class);
 
 
     // =========================================================================
@@ -86,36 +89,43 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // =========================================================================
     // 4. SETTINGS GROUP (Semua menu di sidebar 'Settings')
     // =========================================================================
-    Route::prefix('settings')->name('settings.')->middleware(['role:Super Admin|Supervisor'])->group(function () {
+    Route::prefix('settings')->name('settings.')->group(function () {
         
-        // A. MANAJEMEN USER (RBAC)
-        Route::resource('users', UserController::class)
-            ->middleware(['role:Super Admin']);
-        // B. GUDANG (Tampilan View di Menu Settings)
-        // URL: /settings/warehouses -> Name: settings.warehouses.index
+        // A. HALAMAN UTAMA (OVERVIEW)
+        // Diakses oleh Staff (view_settings) atau Super Admin
+        Route::get('/', [SettingController::class, 'index'])
+            ->name('index')
+            ->middleware('permission:view_settings');
+
+        // B. KATEGORI (Resource Controller Penuh)
+        // Permission check (manage_categories) handled inside CategoryController
+        Route::resource('categories', CategoryController::class);
+
+        // C. GUDANG (Tampilan View di Menu Settings)
+        // Permission check (manage_warehouses) handled inside SettingController
         Route::get('/warehouses', [SettingController::class, 'warehouseIndex'])->name('warehouses.index');
 
-        // C. MATERIAL CREATION (Tampilan View)
+        // D. MANAJEMEN USER (RBAC) - KHUSUS SUPER ADMIN
+        Route::resource('users', UserController::class)
+            ->middleware(['role:Super Admin']);
+
+        // E. MATERIAL CREATION (Tampilan View)
         Route::get('/materials', [SettingController::class, 'materialCreate'])->name('materials.create');
 
-        // D. ATTRIBUTES (Page Unit & Kategori)
+        // F. ATTRIBUTES (Page Unit & Kategori)
         Route::get('/attributes', [AttributeController::class, 'index'])->name('attributes.index');
 
-        // E. Roles
-       Route::resource('roles', \App\Http\Controllers\RoleController::class)
+        // G. ROLES & PERMISSIONS - KHUSUS SUPER ADMIN
+        Route::resource('roles', RoleController::class)
             ->except(['create', 'show', 'edit'])
             ->middleware(['role:Super Admin']);
+            
         // --- AKSI CRUD UNTUK ATRIBUT (Dipanggil via Modal di page Attributes) ---
-        
         // Units
         Route::post('/units', [AttributeController::class, 'storeUnit'])->name('units.store');
         Route::put('/units/{unit}', [AttributeController::class, 'updateUnit'])->name('units.update');
         Route::delete('/units/{unit}', [AttributeController::class, 'destroyUnit'])->name('units.destroy');
 
-        // Categories (Menggunakan AttributeController sesuai logika page Attributes)
-        Route::post('/categories', [AttributeController::class, 'storeCategory'])->name('categories.store');
-        Route::put('/categories/{category}', [AttributeController::class, 'updateCategory'])->name('categories.update');
-        Route::delete('/categories/{category}', [AttributeController::class, 'destroyCategory'])->name('categories.destroy');
     });
 
 
@@ -123,67 +133,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // 5. ROOT RESOURCES (Action Handlers)
     // =========================================================================
     
-    // GUDANG (CRUD Action)
-    // Ditaruh di luar group 'settings' agar nama rutenya tetap standar 'warehouses.store', 
-    // sehingga kita tidak perlu mengubah form React yang sudah ada.
-    Route::resource('warehouses', WarehouseController::class)->except(['index', 'create', 'edit', 'show']);
-
+    // GUDANG (CRUD Action) - SECURITY FIX
+    // Tambahkan middleware role agar Staff tidak bisa tembak API ini
+    Route::resource('warehouses', WarehouseController::class)
+        ->except(['index', 'create', 'edit', 'show'])
+        ->middleware(['permission:manage_warehouses']);
 });
-
-// // --- ROUTE DARURAT: PEMBERSIH DATABASE (HAPUS SETELAH DIPAKAI) ---
-// Route::get('/fix-database-now', function () {
-//     try {
-//         \Illuminate\Support\Facades\DB::transaction(function () {
-//             // 1. HAPUS BERSIH SEMUA DATA (Mode PostgreSQL: CASCADE)
-//             // Urutan tabel sangat penting!
-//             $tables = ['role_has_permissions', 'model_has_roles', 'model_has_permissions', 'permissions', 'roles'];
-//             foreach($tables as $table) {
-//                 \Illuminate\Support\Facades\DB::statement("TRUNCATE TABLE $table RESTART IDENTITY CASCADE");
-//             }
-            
-//             // 2. BUAT PERMISSION STANDAR (Format: view_noun)
-//             $perms = [
-//                 // Dashboard
-//                 'view_dashboard',
-//                 // Transaksi
-//                 'view_inbound', 'create_inbound',
-//                 'view_outbound', 'create_outbound',
-//                 // Inventory
-//                 'view_products', 'create_products', 'edit_products', 'delete_products',
-//                 'view_transfers', 'create_transfers', 'approve_transfers',
-//                 'view_stock_opname',
-//                 // Settings
-//                 'view_settings',
-//                 'manage_users', 'manage_roles', 'manage_warehouses', 'manage_categories'
-//             ];
-
-//             foreach ($perms as $p) {
-//                 \Spatie\Permission\Models\Permission::create(['name' => $p]);
-//             }
-
-//             // 3. SETTING ROLE ULANG
-//             $roleSuper = \Spatie\Permission\Models\Role::create(['name' => 'Super Admin']);
-//             $roleSuper->syncPermissions(\Spatie\Permission\Models\Permission::all());
-
-//             $roleStaff = \Spatie\Permission\Models\Role::create(['name' => 'Staff']);
-//             $roleStaff->syncPermissions([
-//                 'view_dashboard', 'view_inbound', 'create_inbound', 
-//                 'view_outbound', 'create_outbound', 'view_products', 
-//                 'view_transfers', 'create_transfers'
-//             ]);
-
-//             // 4. FIX USER (Hubungkan User Anda ke Role)
-//             $admin = \App\Models\User::where('email', 'like', '%superadmin%')->first();
-//             if($admin) { $admin->assignRole('Super Admin'); $admin->role='Super Admin'; $admin->save(); }
-
-//             $fahmi = \App\Models\User::where('email', 'like', '%fahmi%')->first();
-//             if($fahmi) { $fahmi->assignRole('Staff'); $fahmi->role='Staff'; $fahmi->save(); }
-//         });
-
-//         return "<h1 style='color:green; text-align:center; margin-top:50px;'>SUKSES! Database Telah Dibersihkan & Dirapikan.</h1>";
-//     } catch (\Exception $e) {
-//         return "<h1 style='color:red;'>ERROR: " . $e->getMessage() . "</h1>";
-//     }
-// });
-
 require __DIR__.'/auth.php';

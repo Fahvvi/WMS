@@ -1,104 +1,131 @@
+import { usePage } from '@inertiajs/react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, Link, usePage } from '@inertiajs/react';
-// Tambahkan 'Shield' ke dalam import di sini
-import { Warehouse, Tag, Package, Users, ChevronRight, Settings, Shield } from 'lucide-react';
+import NavLink from '@/Components/NavLink'; // Atau sesuaikan dengan komponen NavLink Anda
+import { 
+    LayoutDashboard, 
+    Tags, 
+    Users, 
+    ShieldCheck, 
+    Warehouse, 
+    Settings,
+    Package
+} from 'lucide-react'; // Pastikan library icon ini ada, atau ganti dengan icon yang Anda pakai
 
 export default function SettingsLayout({ children, title }) {
     const { auth } = usePage().props;
-    const userRole = auth.user.roles?.[0]?.name || auth.user.role || 'staff';
+    
+    // Ambil Permissions & Roles dari User yang sedang login
+    // FIX: Ambil permission dari auth.permissions (sesuai AuthenticatedLayout) agar terbaca
+    const userPermissions = auth.permissions || auth.user.permissions || [];
 
-    // Menu Items
+    // FIX: Mapping Role Object ke Array String (karena auth.user.roles biasanya array of objects)
+    const rawRoles = auth.user.roles || [];
+    const userRoles = Array.isArray(rawRoles) 
+        ? rawRoles.map(r => (typeof r === 'object' ? r.name : r)) 
+        : [];
+    if (auth.user.role) userRoles.push(auth.user.role);
+
+    // Helper: Cek apakah User punya izin ATAU dia Super Admin
+    const can = (permissionName) => {
+        const isSuperAdmin = userRoles.some(r => r.toLowerCase() === 'super admin');
+        return isSuperAdmin || userPermissions.includes(permissionName);
+    };
+
+    // Daftar Menu yang akan dirender secara dinamis
     const menuItems = [
-        { 
-            name: 'Data Gudang', 
-            href: route('settings.warehouses.index'), 
-            active: route().current('settings.warehouses.*'),
-            icon: <Warehouse size={18} /> 
+        {
+            label: 'Overview',
+            route: 'settings.index',
+            active: 'settings.index',
+            icon: <LayoutDashboard className="w-5 h-5" />,
+            permission: 'view_settings' // Syarat minimal masuk settings
         },
-        { 
-            name: 'Atribut (Unit & Kategori)', 
-            href: route('settings.attributes.index'), 
-            active: route().current('settings.attributes.*'),
-            icon: <Tag size={18} /> 
+        {
+            label: 'Material Creation',
+            route: 'settings.materials.create', // Pastikan route ini ada di web.php
+            active: 'settings.materials.*',
+            icon: <Package className="w-5 h-5" />,
+            permission: 'create_products' // Gunakan 'manage_categories' agar Staff bisa akses
         },
-        { 
-            name: 'Material Creation', 
-            href: route('settings.materials.create'), 
-            active: route().current('settings.materials.*'),
-            icon: <Package size={18} /> 
+        {
+            label: 'Kategori Barang',
+            route: 'settings.categories.index', // Tambah prefix 'settings.'
+            active: 'settings.categories.*',
+            icon: <Tags className="w-5 h-5" />,
+            permission: 'manage_categories' // Permission khusus Kategori
         },
-        // Menu Manajemen User & Role (Hanya Super Admin)
-        ...(userRole === 'Super Admin' || userRole === 'superadmin' ? [
-            { 
-                name: 'Manajemen User', 
-                href: route('settings.users.index'), 
-                active: route().current('settings.users.*'),
-                icon: <Users size={18} /> 
-            },
-            { 
-                name: 'Manajemen Role', 
-                href: route('settings.roles.index'), 
-                active: route().current('settings.roles.*'),
-                icon: <Shield size={18} /> 
-            }
-        ] : [])
+        {
+            label: 'Gudang (Warehouse)',
+            route: 'settings.warehouses.index', // Tambah prefix 'settings.'
+            active: 'settings.warehouses.*',
+            icon: <Warehouse className="w-5 h-5" />,
+            permission: 'manage_warehouses' // Permission khusus Gudang
+        },
+        {
+            label: 'Manajemen User',
+            route: 'settings.users.index', // Tambah prefix 'settings.'
+            active: 'settings.users.*',
+            icon: <Users className="w-5 h-5" />,
+            permission: 'manage_users' // Permission khusus User
+        },
+        {
+            label: 'Role & Izin',
+            route: 'settings.roles.index', // Tambah prefix 'settings.'
+            active: 'settings.roles.*',
+            icon: <ShieldCheck className="w-5 h-5" />,
+            permission: 'manage_roles' // Permission khusus Role
+        },
+         // Tambahkan menu lain disini, misal:
+         // { label: 'Satuan Unit', route: 'units.index', permission: 'manage_units' },
     ];
 
     return (
-        <AuthenticatedLayout user={auth.user}>
-            <Head title={title} />
-
+        <AuthenticatedLayout
+            user={auth.user}
+            header={<h2 className="font-semibold text-xl text-gray-800 leading-tight">{title || 'Pengaturan'}</h2>}
+        >
             <div className="py-12">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    
-                    {/* Breadcrumb Header */}
-                    <div className="flex items-center gap-2 text-sm text-slate-500 mb-6">
-                        <Link href={route('dashboard')} className="hover:text-indigo-600 transition">Dashboard</Link>
-                        <ChevronRight size={14} />
-                        <span className="font-bold text-slate-800 flex items-center gap-1">
-                            <Settings size={14} /> Pengaturan
-                        </span>
-                        {title && (
-                            <>
-                                <ChevronRight size={14} />
-                                <span className="text-indigo-600 font-medium">{title}</span>
-                            </>
-                        )}
-                    </div>
-
-                    <div className="flex flex-col lg:flex-row gap-8">
+                <div className="max-w-7xl mx-auto sm:px-6 lg:px-8">
+                    <div className="flex flex-col md:flex-row gap-6">
                         
-                        {/* Sidebar Menu */}
-                        <div className="w-full lg:w-64 shrink-0">
-                            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden sticky top-24">
-                                <div className="p-4 border-b border-slate-100 bg-slate-50/50">
-                                    <h3 className="font-bold text-slate-800 text-sm">Menu Pengaturan</h3>
+                        {/* SIDEBAR DINAMIS */}
+                        <aside className="w-full md:w-64 flex-shrink-0">
+                            <div className="bg-white overflow-hidden shadow-sm sm:rounded-lg sticky top-6">
+                                <div className="p-4 border-b border-gray-100">
+                                    <h3 className="font-bold text-gray-700 flex items-center gap-2">
+                                        <Settings className="w-5 h-5 text-indigo-600" />
+                                        Menu Pengaturan
+                                    </h3>
                                 </div>
-                                <div className="p-2 space-y-1">
+                                <nav className="p-2 space-y-1">
                                     {menuItems.map((item, index) => (
-                                        <Link
-                                            key={index}
-                                            href={item.href}
-                                            className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                                                item.active 
-                                                ? 'bg-indigo-50 text-indigo-700 shadow-sm' 
-                                                : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-                                            }`}
-                                        >
-                                            <span className={`${item.active ? 'text-indigo-600' : 'text-slate-400'}`}>
-                                                {item.icon}
-                                            </span>
-                                            {item.name}
-                                        </Link>
+                                        // RENDER HANYA JIKA USER PUNYA IZIN
+                                        can(item.permission) && (
+                                            <NavLink 
+                                                key={index}
+                                                href={route(item.route)} 
+                                                active={route().current(item.active)}
+                                                className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
+                                                    route().current(item.active)
+                                                        ? 'bg-indigo-50 text-indigo-700 border-l-4 border-indigo-600'
+                                                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                                                }`}
+                                            >
+                                                <span className={`${route().current(item.active) ? 'text-indigo-600' : 'text-gray-400'}`}>
+                                                    {item.icon}
+                                                </span>
+                                                {item.label}
+                                            </NavLink>
+                                        )
                                     ))}
-                                </div>
+                                </nav>
                             </div>
-                        </div>
+                        </aside>
 
-                        {/* Content Area */}
-                        <div className="flex-1">
+                        {/* KONTEN UTAMA */}
+                        <main className="flex-1">
                             {children}
-                        </div>
+                        </main>
 
                     </div>
                 </div>

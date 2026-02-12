@@ -90,7 +90,6 @@ export default function TransactionCreate({ auth, type, warehouses = [], newTrxN
 
     const processProductScan = async (code) => {
         try {
-            // Ambil data produk + stok di gudang yang dipilih
             const response = await window.axios.get(route('products.check', { 
                 code: code,
                 warehouse_id: data.warehouse_id 
@@ -99,43 +98,52 @@ export default function TransactionCreate({ auth, type, warehouses = [], newTrxN
             const result = response.data;
 
             if (result.status === 'found') {
+                // ... (tetap gunakan kode lama Anda untuk bagian produk ditemukan)
                 const product = result.product;
                 const currentStock = result.current_stock || 0; 
-
                 if (type === 'outbound') {
-                    // Cek apakah barang sudah ada di list scan?
                     const existingItem = data.items.find(item => item.product_id === product.id);
                     const currentQtyInCart = existingItem ? existingItem.quantity : 0;
-                    
-                    // VALIDASI STOK (Outbound tidak boleh melebihi stok)
                     if (currentQtyInCart + 1 > currentStock) {
                         playAudio('error');
-                        MySwal.fire({
-                            icon: 'warning',
-                            title: 'Stok Tidak Cukup!',
-                            html: `Stok <b>${product.name}</b> di gudang ini hanya sisa: <b class="text-red-600 text-lg">${currentStock}</b>.<br/>Anda sudah scan ${currentQtyInCart} pcs.`,
-                        });
+                        MySwal.fire({ icon: 'warning', title: 'Stok Tidak Cukup!', html: `Stok <b>${product.name}</b>...` });
                         return; 
                     }
                 }
-                
-                // Tambahkan ke Cart dengan info stok terakhir
                 addItemToCart(product, currentStock);
                 playAudio('success');
                 toast.success(`${product.name} (+1)`);
 
             } else {
+                // --- LOGIKA BARU UNTUK BARANG TIDAK DITEMUKAN ---
                 playAudio('error'); 
+
+                // Ambil data permission dari props auth
+                const canCreateProduct = auth.permissions.includes('create_products') || 
+                                         auth.user.roles.some(r => r.name === 'Super Admin');
+
                 if (type === 'inbound') {
-                    setNewProduct({ 
-                        name: '', 
-                        sku: code, 
-                        barcode: code, 
-                        unit: '', 
-                        category: '' 
-                    });
-                    setIsModalOpen(true);
+                    if (canCreateProduct) {
+                        // Jika punya izin, tampilkan modal buat produk baru
+                        setNewProduct({ 
+                            name: '', 
+                            sku: code, 
+                            barcode: code, 
+                            unit: '', 
+                            category: '' 
+                        });
+                        setIsModalOpen(true);
+                    } else {
+                        // Jika TIDAK punya izin, tampilkan pesan peringatan saja
+                        MySwal.fire({
+                            icon: 'error',
+                            title: 'Barang Tidak Terdaftar',
+                            text: 'Kode barang ini belum ada di database. Silakan hubungi Supervisor atau Admin untuk mendaftarkan barang baru.',
+                            confirmButtonColor: '#4f46e5'
+                        });
+                    }
                 } else {
+                    // Jika Outbound dan barang tidak ada
                     MySwal.fire({
                         icon: 'error',
                         title: 'Barang Tidak Dikenal',

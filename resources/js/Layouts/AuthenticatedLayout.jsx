@@ -160,7 +160,10 @@ export default function AuthenticatedLayout({ user, header, children }) {
 
                                 {/* --- SETTINGS --- */}
                                 {canViewSettings && (
-                                    <NavLink href={route('settings.warehouses.index')} active={route().current('settings.*')} icon={<Settings size={18}/>}>
+                                   <NavLink 
+                                        href={route('settings.index')} 
+                                        active={route().current('settings.*')}
+                                    >
                                         Settings
                                     </NavLink>
                                 )}
@@ -262,7 +265,7 @@ export default function AuthenticatedLayout({ user, header, children }) {
                         )}
 
                         {canViewSettings && (
-                            <MobileNavLink href={route('settings.warehouses.index')} active={route().current('settings.*')} icon={<Settings size={18}/>}>
+                            <MobileNavLink href={route('settings.index')} active={route().current('settings.*')} icon={<Settings size={18}/>}>
                                 Settings
                             </MobileNavLink>
                         )}

@@ -51,6 +51,9 @@ class ProductController extends Controller
 
     public function store(Request $request)
     {
+        // SECURITY FIX: Pastikan hanya user dengan izin create_products yang bisa akses
+        if (!auth()->user()->can('create_products')) abort(403, 'UNAUTHORIZED');
+
         // 1. Validasi
         $request->validate([
             'name' => 'required|string|max:255',
@@ -126,6 +129,9 @@ class ProductController extends Controller
 
     public function update(Request $request, Product $product)
     {
+        // SECURITY FIX: Pastikan hanya user dengan izin edit_products yang bisa akses
+        if (!auth()->user()->can('edit_products')) abort(403, 'UNAUTHORIZED');
+
         // 1. VALIDASI UPDATE
         $request->validate([
             'name' => 'required|string|max:255',
@@ -219,6 +225,9 @@ class ProductController extends Controller
 
     public function destroy(Product $product)
     {
+        // SECURITY FIX: Pastikan hanya user dengan izin delete_products yang bisa akses
+        if (!auth()->user()->can('delete_products')) abort(403, 'UNAUTHORIZED');
+
         $product->delete();
         return redirect()->back()->with('success', 'Produk berhasil dihapus.');
     }
