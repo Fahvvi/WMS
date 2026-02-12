@@ -33,12 +33,12 @@ class SettingController extends Controller
      */
     public function warehouseIndex(Request $request)
     {
-        // SECURITY CHECK: Cek apakah user boleh kelola gudang?
-        // Jika Staff (yang hanya punya manage_categories) mencoba masuk sini -> DITOLAK
+        // Security Check
         if (!auth()->user()->can('manage_warehouses')) {
             abort(403, 'AKSES DITOLAK: ANDA TIDAK BOLEH MENGELOLA GUDANG.');
         }
 
+        // 1. Data Gudang (Pagination)
         $query = $request->input('search');
         $warehouses = Warehouse::query()
             ->when($query, function ($q) use ($query) {
@@ -48,8 +48,12 @@ class SettingController extends Controller
             ->orderBy('created_at', 'desc')
             ->paginate(10)->withQueryString();
 
+        // 2. Data Unit (Semua) - KEMBALIKAN DATA INI
+        $units = Unit::orderBy('name')->get();
+
         return Inertia::render('Settings/Warehouse', [
             'warehouses' => $warehouses,
+            'units' => $units, 
             'filters' => $request->only(['search']),
         ]);
     }

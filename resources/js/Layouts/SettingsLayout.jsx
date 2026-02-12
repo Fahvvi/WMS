@@ -55,7 +55,7 @@ export default function SettingsLayout({ children, title }) {
             permission: 'manage_categories' // Permission khusus Kategori
         },
         {
-            label: 'Gudang (Warehouse)',
+            label: 'Gudang & Unit',
             route: 'settings.warehouses.index', // Tambah prefix 'settings.'
             active: 'settings.warehouses.*',
             icon: <Warehouse className="w-5 h-5" />,

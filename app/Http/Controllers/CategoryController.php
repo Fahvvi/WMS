@@ -19,18 +19,23 @@ class CategoryController extends Controller
 
         $query = $request->input('search');
 
-        $categories = Category::query()
-            ->when($query, function ($q) use ($query) {
-                $q->where('name', 'ilike', "%{$query}%");
-            })
-            ->latest()
-            ->paginate(10)
-            ->withQueryString();
+        $categories = Category::with('parent') // Pastikan relasi parent dimuat
+        ->when($query, function ($q) use ($query) {
+            $q->where('name', 'ilike', "%{$query}%")
+              ->orWhere('code', 'ilike', "%{$query}%");
+        })
+        ->latest()
+        ->paginate(10)
+        ->withQueryString();
 
-        return Inertia::render('Settings/Category', [ // Pastikan nama file Page sesuai
-            'categories' => $categories,
-            'filters' => $request->only(['search']),
-        ]);
+    // TAMBAHKAN INI: Ambil semua kategori untuk dropdown parent
+            $allCategories = Category::orderBy('name')->get(); 
+
+            return Inertia::render('Settings/Category', [
+                'categories' => $categories,
+                'allCategories' => $allCategories, // <--- JANGAN LUPA INI
+                'filters' => $request->only(['search']),
+            ]);
     }
 
     // METHOD INI WAJIB ADA JIKA PAKAI RESOURCE ROUTE
@@ -51,14 +56,25 @@ class CategoryController extends Controller
 
     public function store(Request $request)
     {
+        // Security Check
         if (!auth()->user()->can('manage_categories')) abort(403);
 
+        // 1. VALIDASI
         $request->validate([
             'name' => 'required|string|max:255|unique:categories,name',
+            // Pastikan 'code' required jika di database not-null
+            'code' => 'required|string|max:10|unique:categories,code', 
+            'color' => 'nullable|string|max:20',
+            'parent_id' => 'nullable|exists:categories,id'
         ]);
 
+        // 2. CREATE
         Category::create([
-            'name' => $request->name
+            'name' => $request->name,
+            // Pastikan ini mengambil dari request, bukan null
+            'code' => strtoupper($request->code), 
+            'color' => $request->color ?? '#6366f1',
+            'parent_id' => $request->parent_id
         ]);
 
         return back()->with('success', 'Kategori berhasil ditambahkan.');

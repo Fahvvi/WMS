@@ -13,6 +13,7 @@ use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\RoleController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\StockOpnameController;
 use Inertia\Inertia;
 
 /*
@@ -62,6 +63,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/transfers', [StockTransferController::class, 'store'])->name('store');
         Route::get('/stocks/{warehouse}', [StockTransferController::class, 'getWarehouseStocks'])->name('get-stocks');
     });
+
+    Route::prefix('inventory')->name('stock-opnames.')->group(function () {
+            Route::get('/opname', [StockOpnameController::class, 'index'])->name('index');
+            Route::get('/opname/create', [StockOpnameController::class, 'create'])->name('create');
+            Route::post('/opname', [StockOpnameController::class, 'store'])->name('store');
+            });
 
     // B. PRODUCTS (Master Data Barang)
     // Note: Route custom (check/print) HARUS diletakkan SEBELUM Route::resource

@@ -147,11 +147,9 @@ export default function AuthenticatedLayout({ user, header, children }) {
                                                 )}
                                                 
                                                 {canViewStockOpname && (
-                                                    <div className="px-4 py-2">
-                                                        <button disabled className="flex items-center gap-3 w-full text-left text-sm font-medium text-slate-300 cursor-not-allowed">
-                                                            <ClipboardList size={16} /> Stock Opname
-                                                        </button>
-                                                    </div>
+                                                    <DropdownLink href={route('stock-opnames.index')} active={route().current('stock-opname.*')}>
+                                                        <ClipboardList size={16} /> Stock Opname
+                                                    </DropdownLink>
                                                 )}
                                             </div>
                                         )}
@@ -259,6 +257,11 @@ export default function AuthenticatedLayout({ user, header, children }) {
                                 {canViewStockTransfers && (
                                     <MobileNavLink href={route('stock-transfers.index')} active={route().current('stock-transfers.*')} icon={<ArrowRightLeft size={18}/>}>
                                         Transfer Stok
+                                    </MobileNavLink>
+                                )}
+                                {canViewStockOpname && (
+                                    <MobileNavLink href={route('stock-opnames.index')} active={route().current('stock-opname.*')} icon={<ClipboardList size={18}/>}>
+                                        Stock Opname
                                     </MobileNavLink>
                                 )}
                             </div>
