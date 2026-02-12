@@ -19,14 +19,15 @@ class WmsSeeder extends Seeder
 
         // 2. Buat Permission (Gunakan firstOrCreate agar tidak error duplikat)
         $permissions = [
-            'dashboard_view',
+            'view_dashboard',
             // Produk
-            'product_view', 'product_create', 'product_edit', 'product_delete',
+            'view_products', 'create_products', 'edit_products', 'delete_products',
             // Transaksi
-            'inbound_view', 'inbound_create',
-            'outbound_view', 'outbound_create',
+            'view_inbound', 'create_inbound',
+            'view_outbound', 'create_outbound',
+            'view_transfers', 'create_transfers', 'approve_transfers',
             // Master Data
-            'warehouse_manage', 'user_manage',
+            'manage_warehouses', 'manage_users', 'manage_roles', 'manage_categories', 'view_settings'
         ];
 
         foreach ($permissions as $permission) {
@@ -34,23 +35,30 @@ class WmsSeeder extends Seeder
         }
 
         // 3. Buat Roles (Gunakan firstOrCreate)
-        $roleSuperAdmin = Role::firstOrCreate(['name' => 'superadmin']);
+        // UBAH: Nama Role harus Title Case sesuai middleware di web.php ('Super Admin')
+        $roleSuperAdmin = Role::firstOrCreate(['name' => 'Super Admin']);
         // Sync permission memastikan permission sesuai list, tidak double
         $roleSuperAdmin->syncPermissions(Permission::all());
 
-        $roleAdmin = Role::firstOrCreate(['name' => 'admin']);
+        // UBAH: admin -> Supervisor (sesuai web.php)
+        $roleAdmin = Role::firstOrCreate(['name' => 'Supervisor']);
         $roleAdmin->syncPermissions([
-            'dashboard_view',
-            'product_view', 'product_create', 'product_edit',
-            'inbound_view', 'inbound_create',
-            'outbound_view', 'outbound_create',
+            'view_dashboard',
+            'view_products', 'create_products', 'edit_products',
+            'view_inbound', 'create_inbound',
+            'view_outbound', 'create_outbound',
+            'view_transfers', 'create_transfers', 'approve_transfers',
+            'manage_warehouses', 'manage_categories', 'view_settings'
         ]);
 
-        $roleUser = Role::firstOrCreate(['name' => 'staff']);
+        // UBAH: staff -> Staff
+        $roleUser = Role::firstOrCreate(['name' => 'Staff']);
         $roleUser->syncPermissions([
-            'dashboard_view',
-            'product_view',
-            'inbound_view',
+            'view_dashboard',
+            'view_products',
+            'view_inbound', 'create_inbound',
+            'view_outbound', 'create_outbound',
+            'view_transfers', 'create_transfers'
         ]);
 
         // 4. Buat Gudang Utama (firstOrCreate berdasarkan Code)
@@ -72,7 +80,7 @@ class WmsSeeder extends Seeder
                 'password' => Hash::make('password'),
             ]
         );
-        $superadmin->assignRole('superadmin');
+        $superadmin->assignRole('Super Admin');
 
         // 6. Buat Admin Gudang
         $adminGudang = User::firstOrCreate(
@@ -82,7 +90,7 @@ class WmsSeeder extends Seeder
                 'password' => Hash::make('password'),
             ]
         );
-        $adminGudang->assignRole('admin');
+        $adminGudang->assignRole('Supervisor');
 
         // 7. Dummy Product
         Product::firstOrCreate(

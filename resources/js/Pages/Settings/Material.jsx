@@ -41,6 +41,18 @@ export default function MaterialIndex({ materials, categories, units, currentCat
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
+    // Auto Open Edit Modal jika ada parameter URL 'auto_edit'
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('auto_edit') === 'true' && materials.data.length === 1) {
+            openEditModal(materials.data[0]);
+            
+            // Hapus param agar tidak popup terus saat refresh/navigasi internal
+            const newUrl = window.location.pathname + window.location.search.replace(/&?auto_edit=true/, '');
+            window.history.replaceState({}, '', newUrl);
+        }
+    }, [materials.data]);
+
     // Filter Logic
     const filteredCategories = categories.filter(c => c.name.toLowerCase().includes(categorySearch.toLowerCase()));
 

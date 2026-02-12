@@ -136,7 +136,7 @@ export default function ProductIndex({ auth, products, filters }) {
                                                             </Link>
 
                                                             {/* Tombol Edit */}
-                                                            <Link href={route('products.edit', product.id)} className="p-2 text-slate-400 hover:text-green-500 hover:bg-green-50 rounded-lg transition">
+                                                            <Link href={route('settings.materials.create', { search: product.sku, auto_edit: true })} className="p-2 text-slate-400 hover:text-green-500 hover:bg-green-50 rounded-lg transition">
                                                                 <Edit className="w-4 h-4" />
                                                             </Link>
 

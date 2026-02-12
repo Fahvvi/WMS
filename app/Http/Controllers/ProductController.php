@@ -30,6 +30,22 @@ class ProductController extends Controller
         return Inertia::render('Product/Index', [
             'products' => $products,
             'filters' => $request->only(['search']),
+            'categories' => Category::orderBy('name')->get(),
+            'units' => Unit::orderBy('name')->get(),
+        ]);
+    }
+
+    public function edit(Product $product)
+    {
+        // Security Check: Hanya user dengan izin 'edit_products'
+        if (!auth()->user()->can('edit_products')) {
+            abort(403, 'ANDA TIDAK MEMILIKI IZIN MENGEDIT PRODUK.');
+        }
+
+        return Inertia::render('Product/Edit', [ // Pastikan Anda punya file Page 'Product/Edit.jsx'
+            'product' => $product,
+            'categories' => Category::orderBy('name')->get(),
+            'units' => Unit::orderBy('name')->get(),
         ]);
     }
 
