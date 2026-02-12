@@ -9,6 +9,9 @@ use Illuminate\Http\Request;
 use Inertia\Inertia;
 use SimpleSoftwareIO\QrCode\Facades\QrCode;
 use Picqer\Barcode\BarcodeGeneratorPNG;
+use App\Models\StockTransferDetail;
+use App\Models\TransactionDetail;
+use App\Models\StockOpnameDetail;
 
 class ProductController extends Controller
 {
@@ -235,14 +238,90 @@ class ProductController extends Controller
     // Page History (Baru ditambahkan sebelumnya)
     public function history(Product $product)
     {
-        $history = \App\Models\TransactionDetail::with(['transaction.user', 'transaction.warehouse'])
+        // 1. Ambil Transaksi (Inbound/Outbound)
+        $transactions = \App\Models\TransactionDetail::with(['transaction.warehouse', 'transaction.user'])
             ->where('product_id', $product->id)
-            ->orderByDesc('created_at')
-            ->paginate(20);
+            ->get()
+            ->map(function ($item) {
+                return [
+                    'id' => $item->id,
+                    'date' => $item->transaction->trx_date,
+                    'type' => $item->transaction->type, // inbound / outbound
+                    'quantity' => $item->transaction->type === 'outbound' ? -$item->quantity : $item->quantity,
+                    'reference' => $item->transaction->trx_number,
+                    'warehouse' => $item->transaction->warehouse->name,
+                    'user' => $item->transaction->user->name,
+                    'notes' => '-', // Bisa ditambah jika ada
+                    'source' => 'transaction'
+                ];
+            });
+
+        // 2. Ambil Transfer Stok (Keluar & Masuk)
+        $transfers = \App\Models\StockTransferDetail::with(['transfer.fromWarehouse', 'transfer.toWarehouse', 'transfer.user'])
+            ->where('product_id', $product->id)
+            ->get()
+            ->flatMap(function ($item) {
+                $results = [];
+                
+                // Record Pengurangan (Dari Gudang Asal)
+                $results[] = [
+                    'id' => $item->id . '_out',
+                    'date' => $item->transfer->transfer_date,
+                    'type' => 'transfer_out',
+                    'quantity' => -$item->quantity,
+                    'reference' => $item->transfer->transfer_number,
+                    'warehouse' => $item->transfer->fromWarehouse->name,
+                    'user' => $item->transfer->user->name,
+                    'notes' => 'Ke: ' . $item->transfer->toWarehouse->name,
+                    'source' => 'transfer'
+                ];
+
+                // Record Penambahan (Ke Gudang Tujuan) - Hanya jika status completed/approved
+                if ($item->transfer->status === 'approved' || $item->transfer->status === 'completed') {
+                    $results[] = [
+                        'id' => $item->id . '_in',
+                        'date' => $item->transfer->transfer_date,
+                        'type' => 'transfer_in',
+                        'quantity' => $item->quantity,
+                        'reference' => $item->transfer->transfer_number,
+                        'warehouse' => $item->transfer->toWarehouse->name,
+                        'user' => $item->transfer->user->name,
+                        'notes' => 'Dari: ' . $item->transfer->fromWarehouse->name,
+                        'source' => 'transfer'
+                    ];
+                }
+
+                return $results;
+            });
+
+        // 3. Ambil Stock Opname (BARU)
+        $opnames = \App\Models\StockOpnameDetail::with(['stockOpname.warehouse', 'stockOpname.user'])
+            ->where('product_id', $product->id)
+            ->get()
+            ->map(function ($item) {
+                return [
+                    'id' => $item->id,
+                    'date' => $item->stockOpname->opname_date,
+                    'type' => 'stock_opname', // Tipe khusus untuk frontend
+                    'quantity' => $item->difference, // Nilai selisih (+/-)
+                    'reference' => $item->stockOpname->opname_number,
+                    'warehouse' => $item->stockOpname->warehouse->name,
+                    'user' => $item->stockOpname->user->name,
+                    'notes' => "Fisik: {$item->physical_stock} (Sistem: {$item->system_stock})",
+                    'source' => 'opname'
+                ];
+            });
+
+        // Gabungkan semua, urutkan berdasarkan tanggal terbaru
+        $history = $transactions
+            ->concat($transfers)
+            ->concat($opnames)
+            ->sortByDesc('date')
+            ->values();
 
         return Inertia::render('Inventory/History', [
-            'product' => $product,
-            'history' => $history,
+            'product' => $product->load('category', 'unit'),
+            'history' => $history
         ]);
     }
 }
