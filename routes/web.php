@@ -62,17 +62,25 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/transfers/create', [StockTransferController::class, 'create'])->name('create');
         Route::post('/transfers', [StockTransferController::class, 'store'])->name('store');
         Route::get('/stocks/{warehouse}', [StockTransferController::class, 'getWarehouseStocks'])->name('get-stocks');
+        Route::put('/transfers/{stockTransfer}/approve', [StockTransferController::class, 'approve'])->name('approve');
+        Route::put('/transfers/{stockTransfer}/reject', [StockTransferController::class, 'reject'])->name('reject');
+    
     });
 
-    Route::prefix('inventory')->name('stock-opnames.')->group(function () {
-            Route::get('/opname', [StockOpnameController::class, 'index'])->name('index');
-            Route::get('/opname/create', [StockOpnameController::class, 'create'])->name('create');
-            Route::post('/opname', [StockOpnameController::class, 'store'])->name('store');
+        Route::prefix('inventory')->name('stock-opnames.')->middleware(['auth', 'verified'])->group(function () {
+            
+            Route::get('/opnames', [StockOpnameController::class, 'index'])->name('index');
+            Route::get('/opnames/create', [StockOpnameController::class, 'create'])->name('create');
+            Route::post('/opnames', [StockOpnameController::class, 'store'])->name('store');
+            Route::get('/snapshot/{warehouse}', [StockOpnameController::class, 'getWarehouseStockSnapshot'])->name('snapshot');
+            Route::get('/opnames/{stockOpname}', [StockOpnameController::class, 'show'])->name('show');
+            
             });
 
     // B. PRODUCTS (Master Data Barang)
     // Note: Route custom (check/print) HARUS diletakkan SEBELUM Route::resource
     Route::prefix('products')->name('products.')->middleware(['permission:view_products'])->group(function () {
+        Route::get('/export', [ProductController::class, 'export'])->name('export');
         Route::get('/check', [ProductController::class, 'check'])->name('check'); // Cek barcode
         Route::get('/{product}/print', [ProductController::class, 'printLabel'])->name('print');
         Route::get('/{product}/history', [ProductController::class, 'history'])->name('history');

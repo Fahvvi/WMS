@@ -1,6 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, router } from '@inertiajs/react';
-import { Plus, Search, Package, Edit, Trash2, Eye, X, Warehouse, Printer, History } from 'lucide-react';
+import { Plus, Search, Package, Edit, Trash2, Eye, X, Warehouse, Printer, History, Download } from 'lucide-react';
 import { useState } from 'react';
 import Swal from 'sweetalert2';
 
@@ -10,6 +10,9 @@ export default function ProductIndex({ auth, products, filters }) {
     // State untuk Modal Detail Stok
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedProduct, setSelectedProduct] = useState(null);
+
+    // Ambil permissions dari props auth (pastikan backend mengirim ini via HandleInertiaRequests)
+    const permissions = auth.permissions || [];
 
     const handleSearch = (e) => {
         if (e.key === 'Enter') {
@@ -54,18 +57,22 @@ export default function ProductIndex({ auth, products, filters }) {
                             </h2>
                             <p className="text-slate-500 text-sm mt-1">Kelola stok dan master data produk.</p>
                         </div>
-                        {/* Link diperbaiki sesuai route settings */}
-                        <Link href={route('settings.materials.create')} className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-bold shadow-lg shadow-indigo-200 flex items-center gap-2 transition">
-                            <Plus className="w-5 h-5" /> Tambah Barang
-                        </Link>
+                        
+                        {/* Tombol Tambah Barang - Hanya muncul jika punya izin 'create_products' */}
+                        {permissions.includes('create_products') && (
+                            <Link href={route('settings.materials.create')} className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-bold shadow-lg shadow-indigo-200 flex items-center gap-2 transition">
+                                <Plus className="w-5 h-5" /> Tambah Barang
+                            </Link>
+                        )}
                     </div>
 
                     {/* Content Card */}
                     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                         
-                        {/* Toolbar Search */}
-                        <div className="p-5 border-b border-slate-100 bg-slate-50/50">
-                            <div className="relative max-w-md">
+                        {/* Toolbar Search & Export */}
+                        <div className="p-5 border-b border-slate-100 bg-slate-50/50 flex flex-col md:flex-row justify-between items-center gap-4">
+                            {/* Search Bar (Kiri) */}
+                            <div className="relative max-w-md w-full md:w-96">
                                 <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
                                 <input 
                                     type="text" 
@@ -76,6 +83,17 @@ export default function ProductIndex({ auth, products, filters }) {
                                     onKeyDown={handleSearch} 
                                 />
                             </div>
+
+                            {/* Tombol Export (Kanan) */}
+                            {permissions.includes('export_products') && (
+                                <a 
+                                    href={route('products.export')} 
+                                    target="_blank"
+                                    className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition text-sm font-bold shadow-sm w-full md:w-auto justify-center"
+                                >
+                                    <Download className="w-4 h-4" /> Export Excel
+                                </a>
+                            )}
                         </div>
 
                         {/* Table */}
@@ -136,14 +154,18 @@ export default function ProductIndex({ auth, products, filters }) {
                                                             </Link>
 
                                                             {/* Tombol Edit */}
-                                                            <Link href={route('settings.materials.create', { search: product.sku, auto_edit: true })} className="p-2 text-slate-400 hover:text-green-500 hover:bg-green-50 rounded-lg transition">
-                                                                <Edit className="w-4 h-4" />
-                                                            </Link>
+                                                            {permissions.includes('edit_products') && (
+                                                                <Link href={route('settings.materials.create', { search: product.sku, auto_edit: true })} className="p-2 text-slate-400 hover:text-green-500 hover:bg-green-50 rounded-lg transition">
+                                                                    <Edit className="w-4 h-4" />
+                                                                </Link>
+                                                            )}
 
                                                             {/* Tombol Hapus */}
-                                                            <button onClick={() => handleDelete(product.id)} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition">
-                                                                <Trash2 className="w-4 h-4" />
-                                                            </button>
+                                                            {permissions.includes('delete_products') && (
+                                                                <button onClick={() => handleDelete(product.id)} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition">
+                                                                    <Trash2 className="w-4 h-4" />
+                                                                </button>
+                                                            )}
                                                         </div>
                                                     </td>
                                                 </tr>

@@ -17,23 +17,38 @@ class PermissionSeeder extends Seeder
         // 2. Daftar Permission Standar (Format: verb_noun)
         // Ini disesuaikan agar MATCH dengan kode Frontend React Anda
         $permissions = [
+            // --- DASHBOARD ---
             'view_dashboard',
             
-            // Transaksi (Dipisah agar Staff bisa akses spesifik)
+            // --- TRANSAKSI (INBOUND / OUTBOUND) ---
             'view_inbound', 'create_inbound',
             'view_outbound', 'create_outbound',
+            'delete_transactions',
             
-            // Inventory
+            // --- DATA PRODUK (MASTER DATA) ---
             'view_products', 'create_products', 'edit_products', 'delete_products',
-            'view_transfers', 'create_transfers', 'approve_transfers',
-            'view_stock_opname',
+            'import_products', // BARU: Izin upload Excel produk
+            'export_products', // BARU: Izin download Excel produk
             
-            // Settings & Users
+            // --- STOCK TRANSFER (PINDAH GUDANG) ---
+            'view_transfers', 'create_transfers', 'approve_transfers',
+
+            // --- STOCK OPNAME (AUDIT STOK) ---
+            'view_stock_opname',   
+            'create_stock_opname', 
+            'export_stock_opname', // BARU: Download hasil opname
+            
+            // --- LAPORAN & RIWAYAT (HISTORY) ---
+            // Kita pisahkan permission laporan agar Manager bisa akses tanpa harus jadi Admin
+            'view_reports', 
+            'export_stock_history', // BARU: Download kartu stok/riwayat
+            
+            // --- PENGATURAN (SETTINGS) ---
             'view_settings',
-            'manage_users', // Gabungan create/edit/delete user
-            'manage_roles', // Gabungan create/edit/delete role
-            'manage_warehouses',
-            'manage_categories'
+            'manage_users',      
+            'manage_roles',      
+            'manage_warehouses', 
+            'manage_categories', 
         ];
 
         // Buat Permission ke Database

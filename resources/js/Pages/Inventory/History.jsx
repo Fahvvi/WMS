@@ -120,6 +120,7 @@ export default function ProductHistory({ auth, product, history }) {
                                                         {config.label}
                                                     </span>
                                                 </div>
+                                                
                                                 <div className="flex items-center gap-4 text-xs text-slate-500 mt-2">
                                                     <div className="flex items-center gap-1">
                                                         <Calendar className="w-3 h-3" />
@@ -130,11 +131,12 @@ export default function ProductHistory({ auth, product, history }) {
                                                         {log.user}
                                                     </div>
                                                 </div>
-                                                {/* Catatan Tambahan */}
-                                                {log.notes && log.notes !== '-' && (
-                                                    <p className="text-xs text-slate-400 italic mt-1 bg-slate-50 inline-block px-2 py-1 rounded">
-                                                        Catatan: {log.notes}
-                                                    </p>
+
+                                                {/* --- MENAMPILKAN CATATAN --- */}
+                                                {log.notes && (
+                                                    <div className="mt-2 text-xs bg-yellow-50 text-slate-600 px-3 py-2 rounded-lg border border-yellow-100 italic flex items-start gap-1">
+                                                        <span className="font-bold not-italic text-yellow-600">Catatan:</span> "{log.notes}"
+                                                    </div>
                                                 )}
                                             </div>
                                         </div>

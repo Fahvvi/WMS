@@ -12,6 +12,9 @@ use Picqer\Barcode\BarcodeGeneratorPNG;
 use App\Models\StockTransferDetail;
 use App\Models\TransactionDetail;
 use App\Models\StockOpnameDetail;
+use Maatwebsite\Excel\Facades\Excel;
+use App\Exports\ProductsExport;
+use App\Imports\ProductsImport;
 
 class ProductController extends Controller
 {
@@ -238,90 +241,127 @@ class ProductController extends Controller
     // Page History (Baru ditambahkan sebelumnya)
     public function history(Product $product)
     {
-        // 1. Ambil Transaksi (Inbound/Outbound)
-        $transactions = \App\Models\TransactionDetail::with(['transaction.warehouse', 'transaction.user'])
+        if (!auth()->user()->can('view_products')) abort(403);
+
+        // 1. Ambil Transaksi Biasa (Inbound/Outbound)
+        $transactions = \App\Models\TransactionDetail::with(['transaction.user', 'transaction.warehouse'])
             ->where('product_id', $product->id)
             ->get()
-            ->map(function ($item) {
+            ->map(function ($detail) {
                 return [
-                    'id' => $item->id,
-                    'date' => $item->transaction->trx_date,
-                    'type' => $item->transaction->type, // inbound / outbound
-                    'quantity' => $item->transaction->type === 'outbound' ? -$item->quantity : $item->quantity,
-                    'reference' => $item->transaction->trx_number,
-                    'warehouse' => $item->transaction->warehouse->name,
-                    'user' => $item->transaction->user->name,
-                    'notes' => '-', // Bisa ditambah jika ada
-                    'source' => 'transaction'
+                    'id' => $detail->id,
+                    'type' => $detail->transaction->type, // inbound / outbound
+                    'date' => $detail->transaction->trx_date,
+                    'reference' => $detail->transaction->trx_number,
+                    'quantity' => $detail->quantity,
+                    'user' => $detail->transaction->user->name ?? 'Unknown',
+                    'warehouse' => $detail->transaction->warehouse->name ?? '-',
+                    'notes' => $detail->transaction->notes, // Ambil catatan transaksi
+                    'timestamp' => $detail->created_at,
                 ];
             });
 
-        // 2. Ambil Transfer Stok (Keluar & Masuk)
-        $transfers = \App\Models\StockTransferDetail::with(['transfer.fromWarehouse', 'transfer.toWarehouse', 'transfer.user'])
+        // 2. Ambil Stock Transfer (Pindah Gudang)
+        // Kita perlu memecah ini menjadi dua sisi: Masuk (IN) dan Keluar (OUT)
+        // Karena history per produk harus jelas gudang mana yang bertambah/berkurang
+        
+        $transfers = \App\Models\StockTransferDetail::with(['transfer.user', 'transfer.fromWarehouse', 'transfer.toWarehouse'])
             ->where('product_id', $product->id)
+            ->whereHas('transfer', function($q) {
+                $q->where('status', 'completed'); // Hanya yang sudah selesai
+            })
             ->get()
-            ->flatMap(function ($item) {
-                $results = [];
+            ->flatMap(function ($detail) {
+                // Return dua record untuk history (Satu keluar dari asal, Satu masuk ke tujuan)
+                // ATAU cukup satu record tergantung konteks gudang mana yang dilihat.
+                // Tapi karena ini History Produk (Global), kita tampilkan sebagai "Transfer"
                 
-                // Record Pengurangan (Dari Gudang Asal)
-                $results[] = [
-                    'id' => $item->id . '_out',
-                    'date' => $item->transfer->transfer_date,
-                    'type' => 'transfer_out',
-                    'quantity' => -$item->quantity,
-                    'reference' => $item->transfer->transfer_number,
-                    'warehouse' => $item->transfer->fromWarehouse->name,
-                    'user' => $item->transfer->user->name,
-                    'notes' => 'Ke: ' . $item->transfer->toWarehouse->name,
-                    'source' => 'transfer'
-                ];
-
-                // Record Penambahan (Ke Gudang Tujuan) - Hanya jika status completed/approved
-                if ($item->transfer->status === 'approved' || $item->transfer->status === 'completed') {
-                    $results[] = [
-                        'id' => $item->id . '_in',
-                        'date' => $item->transfer->transfer_date,
-                        'type' => 'transfer_in',
-                        'quantity' => $item->quantity,
-                        'reference' => $item->transfer->transfer_number,
-                        'warehouse' => $item->transfer->toWarehouse->name,
-                        'user' => $item->transfer->user->name,
-                        'notes' => 'Dari: ' . $item->transfer->fromWarehouse->name,
-                        'source' => 'transfer'
-                    ];
-                }
-
-                return $results;
-            });
-
-        // 3. Ambil Stock Opname (BARU)
-        $opnames = \App\Models\StockOpnameDetail::with(['stockOpname.warehouse', 'stockOpname.user'])
-            ->where('product_id', $product->id)
-            ->get()
-            ->map(function ($item) {
                 return [
-                    'id' => $item->id,
-                    'date' => $item->stockOpname->opname_date,
-                    'type' => 'stock_opname', // Tipe khusus untuk frontend
-                    'quantity' => $item->difference, // Nilai selisih (+/-)
-                    'reference' => $item->stockOpname->opname_number,
-                    'warehouse' => $item->stockOpname->warehouse->name,
-                    'user' => $item->stockOpname->user->name,
-                    'notes' => "Fisik: {$item->physical_stock} (Sistem: {$item->system_stock})",
-                    'source' => 'opname'
+                    [
+                        'id' => $detail->id . '_out',
+                        'type' => 'transfer_out',
+                        'date' => $detail->transfer->transfer_date,
+                        'reference' => $detail->transfer->transfer_number,
+                        'quantity' => $detail->quantity, // Keluar = Negatif secara logika display
+                        'user' => $detail->transfer->user->name ?? 'Unknown',
+                        'warehouse' => $detail->transfer->fromWarehouse->name, // Gudang Asal
+                        'notes' => $detail->transfer->notes, // <--- TAMBAHKAN INI
+                        'timestamp' => $detail->created_at,
+                    ],
+                    [
+                        'id' => $detail->id . '_in',
+                        'type' => 'transfer_in',
+                        'date' => $detail->transfer->transfer_date,
+                        'reference' => $detail->transfer->transfer_number,
+                        'quantity' => $detail->quantity, // Masuk = Positif
+                        'user' => $detail->transfer->user->name ?? 'Unknown',
+                        'warehouse' => $detail->transfer->toWarehouse->name, // Gudang Tujuan
+                        'notes' => $detail->transfer->notes, // <--- TAMBAHKAN INI
+                        'timestamp' => $detail->created_at,
+                    ]
                 ];
             });
 
-        // Gabungkan semua, urutkan berdasarkan tanggal terbaru
-        $history = $transactions
-            ->concat($transfers)
-            ->concat($opnames)
-            ->sortByDesc('date')
-            ->values();
+        // 3. Ambil Stock Opname (Penyesuaian)
+        $opnames = \App\Models\StockOpnameDetail::with(['opname.user', 'opname.warehouse'])
+            ->where('product_id', $product->id)
+            ->whereHas('opname', function($q) {
+                $q->where('status', 'completed');
+            })
+            ->get()
+            ->map(function ($detail) {
+                $selisih = $detail->actual_qty - $detail->system_qty;
+                return [
+                    'id' => $detail->id,
+                    'type' => 'stock_opname',
+                    'date' => $detail->opname->opname_date,
+                    'reference' => $detail->opname->opname_number,
+                    'quantity' => $selisih, // Bisa plus/minus
+                    'user' => $detail->opname->user->name ?? 'Unknown',
+                    'warehouse' => $detail->opname->warehouse->name ?? '-',
+                    'notes' => $detail->opname->notes ?? 'Penyesuaian Stok (Audit)', // <--- Ambil Notes Opname
+                    'timestamp' => $detail->created_at,
+                ];
+            });
+
+        // Gabungkan semua, urutkan berdasarkan waktu, lalu paginate manual
+        $allHistory = $transactions->concat($transfers)->concat($opnames)->sortByDesc('timestamp')->values();
+
+        // Manual Pagination (Karena kita menggabungkan collection)
+        $perPage = 10;
+        $page = request()->get('page', 1);
+        $paginatedHistory = new \Illuminate\Pagination\LengthAwarePaginator(
+            $allHistory->forPage($page, $perPage)->values(),
+            $allHistory->count(),
+            $perPage,
+            $page,
+            ['path' => request()->url(), 'query' => request()->query()]
+        );
 
         return Inertia::render('Inventory/History', [
-            'product' => $product->load('category', 'unit'),
-            'history' => $history
+            'product' => $product,
+            'history' => $paginatedHistory
         ]);
     }
+
+        public function export() {
+            if (!auth()->user()->can('export_products')) abort(403);
+            return Excel::download(new ProductsExport, 'products_'.date('Y-m-d').'.xlsx');
+        }
+
+        public function import(Request $request) 
+        {
+            if (!auth()->user()->can('import_products')) abort(403);
+            
+            $request->validate([
+                'file' => 'required|mimes:xlsx,xls,csv'
+            ]);
+
+            try {
+                Excel::import(new ProductsImport, $request->file('file'));
+                return back()->with('success', 'Data Berhasil Diimpor!');
+            } catch (\Exception $e) {
+                return back()->with('error', 'Gagal Impor: ' . $e->getMessage());
+        }
+}
 }

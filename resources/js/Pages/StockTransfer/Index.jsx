@@ -1,15 +1,74 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, Link } from '@inertiajs/react';
-import { ArrowRightLeft, Plus, Search, Calendar, Package, ArrowRight } from 'lucide-react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
+import { ArrowRightLeft, Plus, Search, Calendar, Package, ArrowRight, CheckCircle, XCircle, Clock } from 'lucide-react';
 import { useState } from 'react';
+import Swal from 'sweetalert2';
 
 export default function StockTransferIndex({ auth, transfers }) {
     const [searchTerm, setSearchTerm] = useState('');
+    
+    // Ambil permission dari props (pastikan backend mengirim ini)
+    const permissions = auth.permissions || [];
+    const canApprove = permissions.includes('approve_transfers');
+
+    const handleSearch = (e) => {
+        if (e.key === 'Enter') {
+            router.get(route('stock-transfers.index'), { search: searchTerm }, { preserveState: true, replace: true });
+        }
+    };
 
     const formatDate = (dateString) => {
         return new Date(dateString).toLocaleDateString('id-ID', {
-            day: 'numeric', month: 'long', year: 'numeric'
+            day: 'numeric', month: 'short', year: 'numeric'
         });
+    };
+
+    // Handle Approve
+    const handleApprove = (id) => {
+        Swal.fire({
+            title: 'Setujui Transfer?',
+            text: "Stok akan dipindahkan dari gudang asal ke tujuan.",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#16a34a',
+            cancelButtonColor: '#64748b',
+            confirmButtonText: 'Ya, Setujui',
+            cancelButtonText: 'Batal'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                router.put(route('stock-transfers.approve', id));
+            }
+        });
+    };
+
+    // Handle Reject
+    const handleReject = (id) => {
+        Swal.fire({
+            title: 'Tolak Pengajuan?',
+            text: "Pengajuan transfer akan dibatalkan.",
+            icon: 'error',
+            showCancelButton: true,
+            confirmButtonColor: '#dc2626',
+            cancelButtonColor: '#64748b',
+            confirmButtonText: 'Ya, Tolak',
+            cancelButtonText: 'Batal'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                router.put(route('stock-transfers.reject', id));
+            }
+        });
+    };
+
+    // Helper Badge Status
+    const getStatusBadge = (status) => {
+        switch(status) {
+            case 'completed':
+                return <span className="inline-flex items-center gap-1 bg-green-100 text-green-700 px-2.5 py-0.5 rounded-full text-xs font-bold border border-green-200"><CheckCircle className="w-3 h-3" /> Selesai</span>;
+            case 'rejected':
+                return <span className="inline-flex items-center gap-1 bg-red-100 text-red-700 px-2.5 py-0.5 rounded-full text-xs font-bold border border-red-200"><XCircle className="w-3 h-3" /> Ditolak</span>;
+            default: // pending
+                return <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-700 px-2.5 py-0.5 rounded-full text-xs font-bold border border-amber-200 animate-pulse"><Clock className="w-3 h-3" /> Menunggu Approval</span>;
+        }
     };
 
     return (
@@ -23,19 +82,22 @@ export default function StockTransferIndex({ auth, transfers }) {
                     <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-6">
                         <div>
                             <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-                                <ArrowRightLeft className="w-8 h-8 text-indigo-600" /> Riwayat Transfer Stok
+                                <ArrowRightLeft className="w-8 h-8 text-indigo-600" /> Transfer Stok & Approval
                             </h2>
                             <p className="text-slate-500 text-sm mt-1">
-                                Log perpindahan barang antar gudang.
+                                Kelola pengajuan dan riwayat perpindahan barang.
                             </p>
                         </div>
                         
-                        <Link 
-                            href={route('stock-transfers.create')}
-                            className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-bold shadow-lg shadow-indigo-200 flex items-center gap-2 transition-all hover:-translate-y-0.5"
-                        >
-                            <Plus className="w-5 h-5" /> Transfer Baru
-                        </Link>
+                        {/* Tombol Buat Transfer hanya jika punya izin create */}
+                        {permissions.includes('create_transfers') && (
+                            <Link 
+                                href={route('stock-transfers.create')}
+                                className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-bold shadow-lg shadow-indigo-200 flex items-center gap-2 transition-all hover:-translate-y-0.5"
+                            >
+                                <Plus className="w-5 h-5" /> Transfer Baru
+                            </Link>
+                        )}
                     </div>
 
                     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
@@ -50,6 +112,7 @@ export default function StockTransferIndex({ auth, transfers }) {
                                     placeholder="Cari nomor transfer..."
                                     value={searchTerm}
                                     onChange={(e) => setSearchTerm(e.target.value)}
+                                    onKeyDown={handleSearch}
                                 />
                             </div>
                         </div>
@@ -60,16 +123,17 @@ export default function StockTransferIndex({ auth, transfers }) {
                                 <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-100">
                                     <tr>
                                         <th className="px-6 py-4 font-bold">No. Transfer</th>
-                                        <th className="px-6 py-4 font-bold">Rute</th>
-                                        <th className="px-6 py-4 font-bold">Barang</th>
-                                        <th className="px-6 py-4 font-bold">Oleh</th>
+                                        <th className="px-6 py-4 font-bold">Rute Gudang</th>
+                                        <th className="px-6 py-4 font-bold">Item Detail</th>
+                                        <th className="px-6 py-4 font-bold">Pengaju</th>
                                         <th className="px-6 py-4 font-bold text-center">Status</th>
+                                        <th className="px-6 py-4 font-bold text-right">Aksi</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
                                     {transfers.data.length > 0 ? (
                                         transfers.data.map((trf) => (
-                                            <tr key={trf.id} className="hover:bg-slate-50 transition">
+                                            <tr key={trf.id} className={`hover:bg-slate-50 transition ${trf.status === 'pending' ? 'bg-amber-50/30' : ''}`}>
                                                 <td className="px-6 py-4">
                                                     <div className="font-mono font-bold text-indigo-600">
                                                         {trf.transfer_number}
@@ -81,36 +145,69 @@ export default function StockTransferIndex({ auth, transfers }) {
                                                 </td>
                                                 <td className="px-6 py-4">
                                                     <div className="flex items-center gap-2 text-xs font-bold uppercase">
-                                                        <span className="bg-slate-100 text-slate-600 px-2 py-1 rounded border">{trf.from_warehouse?.code}</span>
+                                                        <span className="bg-white text-slate-600 px-2 py-1 rounded border shadow-sm">{trf.from_warehouse?.code}</span>
                                                         <ArrowRight className="w-4 h-4 text-slate-300" />
-                                                        <span className="bg-indigo-50 text-indigo-600 px-2 py-1 rounded border border-indigo-100">{trf.to_warehouse?.code}</span>
+                                                        <span className="bg-indigo-50 text-indigo-600 px-2 py-1 rounded border border-indigo-100 shadow-sm">{trf.to_warehouse?.code}</span>
                                                     </div>
-                                                    <div className="text-xs text-slate-400 mt-1">
+                                                    <div className="text-xs text-slate-400 mt-1 truncate max-w-[200px]">
                                                         {trf.from_warehouse?.name} → {trf.to_warehouse?.name}
                                                     </div>
                                                 </td>
                                                 <td className="px-6 py-4">
-                                                    <div className="font-bold text-slate-800">{trf.product?.name}</div>
-                                                    <div className="text-xs text-slate-500">Qty: <b className="text-slate-800">{trf.quantity}</b> {trf.product?.unit}</div>
+                                                    <div className="flex items-center gap-2">
+                                                        <Package className="w-4 h-4 text-slate-400" />
+                                                        <span className="font-bold text-slate-700">{trf.details_count} Item</span>
+                                                    </div>
+                                                    {trf.notes && (
+                                                        <p className="text-xs text-slate-400 italic mt-1 max-w-[150px] truncate">
+                                                            "{trf.notes}"
+                                                        </p>
+                                                    )}
                                                 </td>
-                                                <td className="px-6 py-4 text-sm text-slate-600">
-                                                    {trf.user?.name}
+                                                <td className="px-6 py-4">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-600">
+                                                            {trf.user?.name.charAt(0)}
+                                                        </div>
+                                                        <span className="text-sm text-slate-600">{trf.user?.name}</span>
+                                                    </div>
                                                 </td>
                                                 <td className="px-6 py-4 text-center">
-                                                    <span className="bg-green-100 text-green-700 px-2 py-1 rounded-full text-xs font-bold border border-green-200">
-                                                        Selesai
-                                                    </span>
+                                                    {getStatusBadge(trf.status)}
+                                                </td>
+                                                <td className="px-6 py-4 text-right">
+                                                    {/* TOMBOL AKSI: Hanya Muncul Jika Pending & Punya Izin Approve */}
+                                                    {trf.status === 'pending' && canApprove ? (
+                                                        <div className="flex justify-end gap-2">
+                                                            <button 
+                                                                onClick={() => handleApprove(trf.id)}
+                                                                className="p-1.5 bg-green-50 text-green-600 hover:bg-green-100 rounded-lg transition border border-green-200"
+                                                                title="Setujui (Approve)"
+                                                            >
+                                                                <CheckCircle className="w-5 h-5" />
+                                                            </button>
+                                                            <button 
+                                                                onClick={() => handleReject(trf.id)}
+                                                                className="p-1.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg transition border border-red-200"
+                                                                title="Tolak (Reject)"
+                                                            >
+                                                                <XCircle className="w-5 h-5" />
+                                                            </button>
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-xs text-slate-300 italic">-</span>
+                                                    )}
                                                 </td>
                                             </tr>
                                         ))
                                     ) : (
-                                        <tr><td colSpan="5" className="px-6 py-8 text-center text-slate-400">Belum ada riwayat transfer.</td></tr>
+                                        <tr><td colSpan="6" className="px-6 py-12 text-center text-slate-400">Belum ada riwayat transfer.</td></tr>
                                     )}
                                 </tbody>
                             </table>
                         </div>
 
-                        {/* PAGINATION FIX (SOLUSI ERROR WHITE SCREEN) */}
+                        {/* PAGINATION */}
                         {transfers.links && transfers.data.length > 0 && (
                             <div className="px-6 py-4 border-t border-slate-100 flex justify-center">
                                 <div className="flex gap-1 flex-wrap justify-center">

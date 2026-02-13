@@ -15,28 +15,135 @@ use Illuminate\Validation\ValidationException;
 class StockTransferController extends Controller
 {
     public function index(Request $request)
-    {
-        // --- SECURITY CHECK (VIEW) ---
-        if (!auth()->user()->can('view_transfers')) {
-            abort(403, 'ANDA TIDAK MEMILIKI AKSES KE HALAMAN TRANSFER STOK.');
-        }
-        // -----------------------------
+{
+    if (!auth()->user()->can('view_transfers')) abort(403);
 
-        $query = $request->input('search');
+    $query = $request->input('search');
 
-        $transfers = StockTransfer::with(['fromWarehouse', 'toWarehouse', 'user'])
-            ->withCount('details') 
-            ->when($query, function ($q) use ($query) {
-                $q->where('transfer_number', 'ilike', "%{$query}%");
-            })
-            ->latest()
-            ->paginate(10)
-            ->withQueryString();
+    $transfers = StockTransfer::with(['fromWarehouse', 'toWarehouse', 'user'])
+        ->withCount('details')
+        ->when($query, function ($q) use ($query) {
+            $q->where('transfer_number', 'ilike', "%{$query}%");
+        })
+        // URUTKAN: Pending paling atas, lalu berdasarkan tanggal terbaru
+        ->orderByRaw("CASE WHEN status = 'pending' THEN 1 ELSE 2 END")
+        ->orderBy('created_at', 'desc')
+        ->paginate(10)
+        ->withQueryString();
 
-        return Inertia::render('StockTransfer/Index', [
-            'transfers' => $transfers,
-            'filters' => $request->only(['search']),
+    return Inertia::render('StockTransfer/Index', [
+        'transfers' => $transfers,
+        'filters' => $request->only(['search']),
+    ]);
+}
+
+public function store(Request $request)
+{
+    if (!auth()->user()->can('create_transfers')) abort(403);
+
+    // ... (Validasi request tetap sama) ...
+    $request->validate([
+        'transfer_number' => 'required|unique:stock_transfers,transfer_number',
+        'transfer_date' => 'required|date',
+        'from_warehouse_id' => 'required|exists:warehouses,id',
+        'to_warehouse_id' => 'required|exists:warehouses,id|different:from_warehouse_id',
+        'items' => 'required|array|min:1',
+    ]);
+
+    try {
+        DB::beginTransaction();
+
+        // 1. Simpan Header (Status PENDING)
+        $transfer = StockTransfer::create([
+            'user_id' => auth()->id(),
+            'transfer_number' => $request->transfer_number,
+            'transfer_date' => $request->transfer_date,
+            'from_warehouse_id' => $request->from_warehouse_id,
+            'to_warehouse_id' => $request->to_warehouse_id,
+            'status' => 'pending', // <--- UBAH JADI PENDING
+            'notes' => $request->notes
         ]);
+
+        // 2. Simpan Detail (TANPA Pindah Stok)
+        foreach ($request->items as $item) {
+            StockTransferDetail::create([
+                'stock_transfer_id' => $transfer->id,
+                'product_id' => $item['product_id'],
+                'quantity' => $item['quantity']
+            ]);
+        }
+
+        DB::commit();
+        return redirect()->route('stock-transfers.index')->with('success', 'Pengajuan transfer berhasil dibuat. Menunggu persetujuan.');
+
+    } catch (\Exception $e) {
+        DB::rollBack();
+        return back()->withErrors(['error' => 'Gagal: ' . $e->getMessage()]);
+    }
+}
+
+public function approve(StockTransfer $stockTransfer)
+    {
+        // Debugging: Cek status sebenarnya
+        // dd($stockTransfer->status); 
+
+        if (!auth()->user()->can('approve_transfers')) abort(403);
+        
+        // Pastikan pengecekan status menggunakan huruf kecil
+        if ($stockTransfer->status !== 'pending') {
+            return back()->with('error', 'Transfer sudah diproses atau status tidak valid.');
+        }
+
+        try {
+            DB::beginTransaction();
+
+            // Gunakan $stockTransfer->details, bukan $transfer->details
+            foreach ($stockTransfer->details as $item) {
+                
+                // ... logic kurangi stok (Copy dari kode sebelumnya) ...
+                
+                // Cek stok asal
+                $currentStock = Stock::where('warehouse_id', $stockTransfer->from_warehouse_id)
+                    ->where('product_id', $item->product_id)
+                    ->value('quantity');
+
+                if (!$currentStock || $currentStock < $item->quantity) {
+                    throw new \Exception("Stok barang (ID: {$item->product_id}) tidak cukup.");
+                }
+
+                // 1. Kurangi Asal
+                Stock::where('warehouse_id', $stockTransfer->from_warehouse_id)
+                    ->where('product_id', $item->product_id)
+                    ->decrement('quantity', $item->quantity);
+
+                // 2. Tambah Tujuan
+                $destStock = Stock::firstOrCreate(
+                    ['warehouse_id' => $stockTransfer->to_warehouse_id, 'product_id' => $item->product_id],
+                    ['quantity' => 0]
+                );
+                $destStock->increment('quantity', $item->quantity);
+            }
+
+            // Update Status
+            $stockTransfer->update(['status' => 'completed']);
+
+            DB::commit();
+            return back()->with('success', 'Transfer disetujui & stok berhasil dipindahkan.');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', $e->getMessage());
+        }
+    }
+
+    // Lakukan hal yang sama untuk reject
+    public function reject(StockTransfer $stockTransfer)
+    {
+        if (!auth()->user()->can('approve_transfers')) abort(403);
+        if ($stockTransfer->status !== 'pending') return back()->with('error', 'Status tidak valid.');
+
+        $stockTransfer->update(['status' => 'rejected']);
+        return back()->with('success', 'Pengajuan transfer ditolak.');
     }
 
     public function create()
@@ -74,7 +181,6 @@ class StockTransferController extends Controller
     public function getWarehouseStocks(Warehouse $warehouse)
     {
         // --- SECURITY CHECK (API) ---
-        // Mencegah user iseng nembak API stok gudang lain
         if (!auth()->user()->can('create_transfers')) {
             abort(403, 'Unauthorized access to warehouse stocks.');
         }
@@ -86,95 +192,18 @@ class StockTransferController extends Controller
             ->get()
             ->map(function ($stock) {
                 return [
-                    'product_id' => $stock->product_id,
+                    // PERBAIKAN DI SINI:
+                    'id' => $stock->product_id, // Frontend butuh 'id' untuk value dropdown
+                    'product_id' => $stock->product_id, 
                     'name' => $stock->product->name,
                     'sku' => $stock->product->sku,
-                    'quantity' => $stock->quantity
+                    'available_qty' => $stock->quantity, // Frontend butuh 'available_qty' untuk validasi max input
+                    'unit' => $stock->product->unit ?? 'Pcs', // Frontend butuh 'unit' untuk label
                 ];
             });
 
         return response()->json($stocks);
     }
 
-    public function store(Request $request)
-    {
-        // --- SECURITY CHECK (STORE) ---
-        if (!auth()->user()->can('create_transfers')) {
-            abort(403, 'TINDAKAN DITOLAK: TIDAK ADA IZIN CREATE TRANSFER');
-        }
-        // ------------------------------
-
-        $request->validate([
-            'transfer_number' => 'required|unique:stock_transfers,transfer_number',
-            'transfer_date' => 'required|date',
-            'from_warehouse_id' => 'required|exists:warehouses,id',
-            'to_warehouse_id' => 'required|exists:warehouses,id|different:from_warehouse_id',
-            'items' => 'required|array|min:1',
-            'items.*.product_id' => 'required|exists:products,id',
-            'items.*.quantity' => 'required|integer|min:1',
-        ]);
-
-        try {
-            DB::beginTransaction();
-
-            // 1. Validasi Stok Terlebih Dahulu (Double Check)
-            foreach ($request->items as $item) {
-                $currentStock = Stock::where('warehouse_id', $request->from_warehouse_id)
-                    ->where('product_id', $item['product_id'])
-                    ->value('quantity');
-
-                if (!$currentStock || $currentStock < $item['quantity']) {
-                    $productName = Product::find($item['product_id'])->name;
-                    throw ValidationException::withMessages([
-                        'items' => "Stok '$productName' tidak mencukupi di gudang asal. Sisa: " . ($currentStock ?? 0)
-                    ]);
-                }
-            }
-
-            // 2. Buat Header Transfer
-            $transfer = StockTransfer::create([
-                'user_id' => auth()->id(),
-                'transfer_number' => $request->transfer_number,
-                'transfer_date' => $request->transfer_date,
-                'from_warehouse_id' => $request->from_warehouse_id,
-                'to_warehouse_id' => $request->to_warehouse_id,
-                'status' => 'completed', 
-                'notes' => $request->notes
-            ]);
-
-            // 3. Proses Item & Mutasi Stok
-            foreach ($request->items as $item) {
-                // Simpan Detail
-                StockTransferDetail::create([
-                    'stock_transfer_id' => $transfer->id,
-                    'product_id' => $item['product_id'],
-                    'quantity' => $item['quantity']
-                ]);
-
-                // Kurangi Stok Gudang ASAL
-                Stock::where('warehouse_id', $request->from_warehouse_id)
-                    ->where('product_id', $item['product_id'])
-                    ->decrement('quantity', $item['quantity']);
-
-                // Tambah Stok Gudang TUJUAN
-                $destStock = Stock::firstOrCreate(
-                    ['warehouse_id' => $request->to_warehouse_id, 'product_id' => $item['product_id']],
-                    ['quantity' => 0]
-                );
-                $destStock->increment('quantity', $item['quantity']);
-            }
-
-            DB::commit();
-
-            return redirect()->route('stock-transfers.index')
-                ->with('success', 'Transfer stok berhasil diproses.');
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            if ($e instanceof ValidationException) {
-                throw $e;
-            }
-            return back()->withErrors(['error' => 'Gagal memproses transfer: ' . $e->getMessage()]);
-        }
-    }
+    
 }
