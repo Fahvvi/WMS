@@ -34,7 +34,7 @@ export default function Login({ status, canResetPassword }) {
                 {/* Background Image Warehouse */}
                 <div 
                     className="absolute inset-0 bg-cover bg-center z-0" 
-                    style={{ backgroundImage: "url('https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80')" }}
+                    style={{ backgroundImage: "url(/gudang.jpg)" }}
                 ></div>
                 
                 {/* Overlay Gradient */}
@@ -46,7 +46,7 @@ export default function Login({ status, canResetPassword }) {
                         <div className="p-3 bg-white/10 backdrop-blur-sm rounded-xl border border-white/20">
                             <Package className="w-10 h-10 text-white" />
                         </div>
-                        <h1 className="text-3xl font-bold tracking-tight">WMS Pro</h1>
+                        <h1 className="text-3xl font-bold tracking-tight">WMSkd</h1>
                     </div>
                     <h2 className="text-4xl font-extrabold mb-4 leading-tight">
                         Kelola Gudang <br/> Lebih Cerdas.
