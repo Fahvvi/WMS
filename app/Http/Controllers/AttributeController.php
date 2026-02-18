@@ -11,6 +11,9 @@ class AttributeController extends Controller
 {
     public function index(Request $request)
     {
+        // SECURITY CHECK
+        if (!auth()->user()->can('manage_categories')) abort(403);
+
         $search = $request->input('search');
 
         // Ambil Data Unit yang SUDAH ADA
@@ -44,6 +47,9 @@ class AttributeController extends Controller
     // --- LOGIC CRUD UNIT (Baru, agar bisa diedit di Settings) ---
     public function storeUnit(Request $request)
     {
+        // SECURITY CHECK
+        if (!auth()->user()->can('manage_categories')) abort(403);
+
         // Validasi short_name (boleh null/kosong)
         $request->validate([
             'name' => 'required|string|max:50',
@@ -60,6 +66,9 @@ class AttributeController extends Controller
 
     public function updateUnit(Request $request, Unit $unit)
     {
+        // SECURITY CHECK
+        if (!auth()->user()->can('manage_categories')) abort(403);
+
         $request->validate([
             'name' => 'required|string|max:50',
             'short_name' => 'nullable|string|max:10'
@@ -75,6 +84,9 @@ class AttributeController extends Controller
 
     public function destroyUnit(Unit $unit)
     {
+        // SECURITY CHECK
+        if (!auth()->user()->can('manage_categories')) abort(403);
+
         $unit->delete();
         return back()->with('success', 'Satuan dihapus.');
     }
@@ -82,6 +94,9 @@ class AttributeController extends Controller
     // --- LOGIC CRUD CATEGORY (Sama seperti sebelumnya) ---
     public function storeCategory(Request $request)
     {
+        // SECURITY CHECK
+        if (!auth()->user()->can('manage_categories')) abort(403);
+
         $request->validate([
             'name' => 'required|string|max:255',
             'code' => 'required|string|max:10|unique:categories,code',
@@ -100,6 +115,9 @@ class AttributeController extends Controller
 
     public function updateCategory(Request $request, Category $category)
     {
+        // SECURITY CHECK
+        if (!auth()->user()->can('manage_categories')) abort(403);
+
         $request->validate([
             'name' => 'required|string|max:255',
             'code' => 'required|string|max:10|unique:categories,code,' . $category->id,
@@ -120,6 +138,9 @@ class AttributeController extends Controller
 
     public function destroyCategory(Category $category)
     {
+        // SECURITY CHECK
+        if (!auth()->user()->can('manage_categories')) abort(403);
+
         $category->delete();
         return back()->with('success', 'Kategori dihapus.');
     }
