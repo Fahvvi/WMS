@@ -3,10 +3,12 @@ import { Head } from '@inertiajs/react';
 import DeleteUserForm from './Partials/DeleteUserForm';
 import UpdatePasswordForm from './Partials/UpdatePasswordForm';
 import UpdateProfileInformationForm from './Partials/UpdateProfileInformationForm';
+import UpdatePreferencesForm from './Partials/UpdatePreferencesForm'; // <--- IMPORT FORM BARU KITA
 
-export default function Edit({ mustVerifyEmail, status }) {
+export default function Edit({ auth, mustVerifyEmail, status }) {
     return (
         <AuthenticatedLayout
+            user={auth.user}
             header={
                 <h2 className="text-xl font-semibold leading-tight text-gray-800 dark:text-gray-200">
                     Profile
@@ -23,6 +25,11 @@ export default function Edit({ mustVerifyEmail, status }) {
                             status={status}
                             className="max-w-xl"
                         />
+                    </div>
+
+                    {/* --- TAMBAHKAN KOTAK PENGATURAN TEMA & BAHASA DI SINI --- */}
+                    <div className="bg-white p-4 shadow sm:rounded-lg sm:p-8 dark:bg-gray-800">
+                        <UpdatePreferencesForm className="max-w-xl" />
                     </div>
 
                     <div className="bg-white p-4 shadow sm:rounded-lg sm:p-8 dark:bg-gray-800">

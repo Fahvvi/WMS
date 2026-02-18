@@ -2,13 +2,15 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-// use Spatie\Activitylog\Traits\LogsActivity;
+use Inertia\Testing\Concerns\Has;
+use Spatie\Activitylog\Traits\LogsActivity;
 use Spatie\Activitylog\LogOptions;
 
 class Product extends Model
 {
-    // use LogsActivity;
+    use HasFactory, LogsActivity;
 
     protected $fillable = [
         'name', 
@@ -23,9 +25,10 @@ class Product extends Model
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
-        ->logOnly(['name', 'sku', 'barcode', 'unit']) // Tambahkan unit ke log juga
-        ->logOnlyDirty()
-        ->setDescriptionForEvent(fn(string $eventName) => "Product has been {$eventName}");
+            ->logFillable()          // Melacak perubahan pada semua atribut di $fillable
+            ->logOnlyDirty()         // Hanya mencatat kolom yang benar-benar BERUBAH
+            ->dontSubmitEmptyLogs()  // Abaikan log jika tidak ada perubahan sama sekali
+            ->setDescriptionForEvent(fn(string $eventName) => "Model ini di-{$eventName}");
     }
 
     protected static function booted()

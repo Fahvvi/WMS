@@ -1,5 +1,6 @@
 import React from 'react';
 import SettingsLayout from '@/Layouts/SettingsLayout';
+import { useApp } from '@/Contexts/AppContext';
 import { Head, Link, usePage } from '@inertiajs/react';
 import { 
     Tags, 
@@ -12,6 +13,7 @@ import {
 
 export default function SettingsIndex() {
     const { auth } = usePage().props;
+    const { t } = useApp();
 
     // --- LOGIC PENGECEKAN PERMISSION (Sama dengan Layout) ---
     const userPermissions = auth.permissions || auth.user.permissions || [];
@@ -29,7 +31,7 @@ export default function SettingsIndex() {
     // --- DAFTAR MENU (KARTU) ---
     const menuCards = [
         {
-            title: 'Kategori Barang',
+            title: t('Kategori Barang'),
             description: 'Kelola kategori produk untuk pengelompokan barang.',
             icon: <Tags className="w-8 h-8 text-white" />,
             color: 'bg-pink-500',
@@ -37,7 +39,7 @@ export default function SettingsIndex() {
             permission: 'manage_categories'
         },
         {
-            title: 'Data Gudang',
+            title: t('Data Gudang'),
             description: 'Tambah atau edit lokasi gudang penyimpanan.',
             icon: <Warehouse className="w-8 h-8 text-white" />,
             color: 'bg-blue-500',
@@ -45,7 +47,7 @@ export default function SettingsIndex() {
             permission: 'manage_warehouses'
         },
         {
-            title: 'Material & Produk',
+            title: t('Material & Produk'),
             description: 'Buat data master produk dan kelola material baru.',
             icon: <Package className="w-8 h-8 text-white" />, // Pastikan icon Package diimport
             color: 'bg-orange-500', // Beri warna berbeda
@@ -53,7 +55,7 @@ export default function SettingsIndex() {
             permission: 'create_products' // Samakan permission dengan Layout
         },
         {
-            title: 'Manajemen User',
+            title: t('Manajemen User'),
             description: 'Kelola akun pengguna, reset password, dan data staff.',
             icon: <Users className="w-8 h-8 text-white" />,
             color: 'bg-indigo-500',
@@ -61,7 +63,7 @@ export default function SettingsIndex() {
             permission: 'manage_users'
         },
         {
-            title: 'Role & Hak Akses',
+            title: t('Role & Hak Akses'),
             description: 'Atur jabatan dan izin akses untuk setiap pengguna.',
             icon: <ShieldCheck className="w-8 h-8 text-white" />,
             color: 'bg-purple-500',
@@ -70,7 +72,7 @@ export default function SettingsIndex() {
         },
         // Tambahkan menu lain jika ada (misal: Unit, Atribut, dll)
         {
-            title: 'Satuan Unit',
+            title: t('Satuan Unit'),
             description: 'Atur satuan pengukuran barang (Pcs, Kg, Box).',
             icon: <Package className="w-8 h-8 text-white" />,
             color: 'bg-emerald-500',
@@ -80,17 +82,17 @@ export default function SettingsIndex() {
     ];
 
     return (
-        <SettingsLayout title="Overview Pengaturan">
-            <Head title="Pengaturan" />
+        <SettingsLayout title={t('Overview')}>
+            <Head title={t('Settings')} />
 
             <div className="space-y-6">
                 {/* Bagian Header Sambutan */}
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-                    <h2 className="text-lg font-bold text-slate-800">
-                        Halo, {auth.user.name}! 👋
+                <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-gray-700 transition-colors">
+                    <h2 className="text-lg font-bold text-slate-800 dark:text-white">
+                        {t('Halo')}, {auth.user.name}! 👋
                     </h2>
-                    <p className="text-slate-500 mt-1">
-                        Selamat datang di panel pengaturan. Silakan pilih menu di bawah ini untuk mengelola konfigurasi sistem WMS Anda.
+                    <p className="text-slate-500 dark:text-slate-400 mt-1">
+                        {t('Selamat datang di panel pengaturan. Silakan pilih menu di bawah ini untuk mengelola konfigurasi sistem WMS Anda.')}
                     </p>
                 </div>
 
@@ -102,15 +104,15 @@ export default function SettingsIndex() {
                             <Link 
                                 key={index} 
                                 href={route(card.route)}
-                                className="group bg-white rounded-2xl p-6 shadow-sm border border-slate-200 hover:shadow-md hover:border-indigo-300 transition-all duration-200 flex flex-col items-start"
+                                className="group bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-slate-200 dark:border-gray-700 hover:shadow-md hover:border-indigo-300 dark:hover:border-indigo-500 transition-all duration-200 flex flex-col items-start"
                             >
                                 <div className={`p-3 rounded-xl shadow-lg mb-4 ${card.color} group-hover:scale-110 transition-transform duration-200`}>
                                     {card.icon}
                                 </div>
-                                <h3 className="text-lg font-bold text-slate-800 group-hover:text-indigo-600 transition-colors">
+                                <h3 className="text-lg font-bold text-slate-800 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
                                     {card.title}
                                 </h3>
-                                <p className="text-sm text-slate-500 mt-2 leading-relaxed">
+                                <p className="text-sm text-slate-500 dark:text-slate-400 mt-2 leading-relaxed">
                                     {card.description}
                                 </p>
                             </Link>
@@ -120,8 +122,8 @@ export default function SettingsIndex() {
 
                 {/* Pesan jika tidak ada menu sama sekali (Jaga-jaga) */}
                 {menuCards.filter(c => can(c.permission)).length === 0 && (
-                    <div className="text-center py-12 bg-slate-50 rounded-2xl border border-dashed border-slate-300">
-                        <p className="text-slate-500">Anda tidak memiliki akses ke menu pengaturan apa pun.</p>
+                    <div className="text-center py-12 bg-slate-50 dark:bg-gray-800 rounded-2xl border border-dashed border-slate-300 dark:border-gray-600">
+                        <p className="text-slate-500 dark:text-slate-400">{t('Anda tidak memiliki akses ke menu pengaturan apa pun.')}</p>
                     </div>
                 )}
             </div>

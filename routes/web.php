@@ -11,6 +11,7 @@ use App\Http\Controllers\AttributeController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\CategoryController; 
 use App\Http\Controllers\RoleController;
+use App\Http\Controllers\BusinessLogController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\StockOpnameController;
@@ -134,7 +135,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::resource('roles', RoleController::class)
             ->except(['create', 'show', 'edit'])
             ->middleware(['role:Super Admin']);
-            
+
+        // Route log bisnis
+        Route::get('/business-log', [BusinessLogController::class, 'index'])->name('business-log');
+        Route::get('/business-log/export', [BusinessLogController::class, 'export'])->name('business-log.export'); 
         // --- AKSI CRUD UNTUK ATRIBUT (Dipanggil via Modal di page Attributes) ---
         // Units
         Route::post('/units', [AttributeController::class, 'storeUnit'])->name('units.store');

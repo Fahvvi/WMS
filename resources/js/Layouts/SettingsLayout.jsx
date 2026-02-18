@@ -1,4 +1,5 @@
 import { usePage } from '@inertiajs/react';
+import { useApp } from '@/Contexts/AppContext';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import NavLink from '@/Components/NavLink'; // Atau sesuaikan dengan komponen NavLink Anda
 import { 
@@ -8,11 +9,13 @@ import {
     ShieldCheck, 
     Warehouse, 
     Settings,
-    Package
+    Package,
+    History
 } from 'lucide-react'; // Pastikan library icon ini ada, atau ganti dengan icon yang Anda pakai
 
 export default function SettingsLayout({ children, title }) {
     const { auth } = usePage().props;
+    const { t } = useApp();
     
     // Ambil Permissions & Roles dari User yang sedang login
     // FIX: Ambil permission dari auth.permissions (sesuai AuthenticatedLayout) agar terbaca
@@ -34,46 +37,53 @@ export default function SettingsLayout({ children, title }) {
     // Daftar Menu yang akan dirender secara dinamis
     const menuItems = [
         {
-            label: 'Overview',
+            label: t('Overview'),
             route: 'settings.index',
             active: 'settings.index',
             icon: <LayoutDashboard className="w-5 h-5" />,
             permission: 'view_settings' // Syarat minimal masuk settings
         },
         {
-            label: 'Material Creation',
+            label: t('Material Creation'),
             route: 'settings.materials.create', // Pastikan route ini ada di web.php
             active: 'settings.materials.*',
             icon: <Package className="w-5 h-5" />,
             permission: 'create_products' // Gunakan 'manage_categories' agar Staff bisa akses
         },
         {
-            label: 'Kategori Barang',
+            label: t('Kategori Barang'),
             route: 'settings.categories.index', // Tambah prefix 'settings.'
             active: 'settings.categories.*',
             icon: <Tags className="w-5 h-5" />,
             permission: 'manage_categories' // Permission khusus Kategori
         },
         {
-            label: 'Gudang & Unit',
+            label: t('Gudang & Unit'),
             route: 'settings.warehouses.index', // Tambah prefix 'settings.'
             active: 'settings.warehouses.*',
             icon: <Warehouse className="w-5 h-5" />,
             permission: 'manage_warehouses' // Permission khusus Gudang
         },
         {
-            label: 'Manajemen User',
+            label: t('Manajemen User'),
             route: 'settings.users.index', // Tambah prefix 'settings.'
             active: 'settings.users.*',
             icon: <Users className="w-5 h-5" />,
             permission: 'manage_users' // Permission khusus User
         },
         {
-            label: 'Role & Izin',
+            label: t('Role & Izin'),
             route: 'settings.roles.index', // Tambah prefix 'settings.'
             active: 'settings.roles.*',
             icon: <ShieldCheck className="w-5 h-5" />,
             permission: 'manage_roles' // Permission khusus Role
+        },
+        {
+            label: t('Log Aktivitas'),
+            route: 'settings.business-log', // Sesuaikan dengan route yang sudah dibuat
+            active: 'settings.business-log',
+            icon: <History className="w-5 h-5" />,
+            permission: 'view_business_log' // Permission khusus Log Aktivitas
         },
          // Tambahkan menu lain disini, misal:
          // { label: 'Satuan Unit', route: 'units.index', permission: 'manage_units' },
@@ -82,7 +92,7 @@ export default function SettingsLayout({ children, title }) {
     return (
         <AuthenticatedLayout
             user={auth.user}
-            header={<h2 className="font-semibold text-xl text-gray-800 leading-tight">{title || 'Pengaturan'}</h2>}
+            header={<h2 className="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">{title || t('Settings')}</h2>}
         >
             <div className="py-12">
                 <div className="max-w-7xl mx-auto sm:px-6 lg:px-8">
@@ -90,11 +100,11 @@ export default function SettingsLayout({ children, title }) {
                         
                         {/* SIDEBAR DINAMIS */}
                         <aside className="w-full md:w-64 flex-shrink-0">
-                            <div className="bg-white overflow-hidden shadow-sm sm:rounded-lg sticky top-6">
-                                <div className="p-4 border-b border-gray-100">
-                                    <h3 className="font-bold text-gray-700 flex items-center gap-2">
+                            <div className="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg sticky top-6 transition-colors duration-200">
+                                <div className="p-4 border-b border-gray-100 dark:border-gray-700">
+                                    <h3 className="font-bold text-gray-700 dark:text-gray-200 flex items-center gap-2">
                                         <Settings className="w-5 h-5 text-indigo-600" />
-                                        Menu Pengaturan
+                                        {t('Menu Pengaturan')}
                                     </h3>
                                 </div>
                                 <nav className="p-2 space-y-1">
@@ -107,8 +117,8 @@ export default function SettingsLayout({ children, title }) {
                                                 active={route().current(item.active)}
                                                 className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
                                                     route().current(item.active)
-                                                        ? 'bg-indigo-50 text-indigo-700 border-l-4 border-indigo-600'
-                                                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                                                        ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 border-l-4 border-indigo-600'
+                                                        : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-gray-200'
                                                 }`}
                                             >
                                                 <span className={`${route().current(item.active) ? 'text-indigo-600' : 'text-gray-400'}`}>

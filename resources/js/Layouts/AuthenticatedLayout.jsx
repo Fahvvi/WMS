@@ -12,6 +12,22 @@ export default function AuthenticatedLayout({ user, header, children }) {
     const inventoryTimeoutRef = useRef(null);
 
     const { props } = usePage(); 
+
+    useEffect(() => {
+        const theme = user.theme;
+        if (theme === 'dark') {
+            document.documentElement.classList.add('dark');
+        } else if (theme === 'light') {
+            document.documentElement.classList.remove('dark');
+        } else {
+            // System
+            if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+        }
+    }, [user.theme]);
     
     // --- 1. AMBIL PERMISSION & ROLE (URUTAN WAJIB DI ATAS) ---
     const permissions = props.auth?.permissions || []; 
@@ -71,6 +87,7 @@ export default function AuthenticatedLayout({ user, header, children }) {
             setShowInventoryMenu(false);
         }, 200);
     };
+
 
     return (
         <div className="min-h-screen bg-slate-50">

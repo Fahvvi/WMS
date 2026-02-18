@@ -8,11 +8,12 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Spatie\Permission\Traits\HasRoles;
 use Laravel\Sanctum\HasApiTokens; // <--- PENTING 1: Import Library
-
+use Spatie\Activitylog\Traits\LogsActivity; // <- 1. Import Trait
+use Spatie\Activitylog\LogOptions;
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, HasApiTokens, Notifiable, HasRoles; // <--- PENTING 2: Pasang Trait di sini
+    use HasFactory, HasApiTokens, Notifiable, HasRoles, LogsActivity; // <--- PENTING 2: Pasang Trait di sini
 
     /**
      * The attributes that are mass assignable.
@@ -25,6 +26,8 @@ class User extends Authenticatable
         'email',
         'password',
         'role',
+        'theme', 
+        'locale',
     ];
 
     /**
@@ -49,4 +52,13 @@ class User extends Authenticatable
             'password' => 'hashed',
         ];
     }
+
+        // <--- PENTING 3: Konfigurasi Log
+        public function getActivitylogOptions(): LogOptions
+        {
+            return LogOptions::defaults()
+                ->logAll() // Log semua atribut
+                ->useLogName('user') // Nama log yang akan muncul di database
+                ->setDescriptionForEvent(fn(string $eventName) => "User has been {$eventName}"); // Deskripsi log
+        }
 }

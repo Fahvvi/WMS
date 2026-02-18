@@ -49,6 +49,7 @@ class PermissionSeeder extends Seeder
             'manage_roles',      
             'manage_warehouses', 
             'manage_categories', 
+            'view_business_log',
         ];
 
         // Buat Permission ke Database

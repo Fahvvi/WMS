@@ -38,6 +38,8 @@ class HandleInertiaRequests extends Middleware
                     ? $request->user()->getAllPermissions()->pluck('name') 
                     : [],
             ],
+            'locale' => fn () => $request->user() ? $request->user()->locale : 'id',
+            'theme' => fn () => $request->user() ? $request->user()->theme : 'light',
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),
                 'error' => fn () => $request->session()->get('error'),
