@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Inertia\Response;
+use App\Models\User;
 
 class AuthenticatedSessionController extends Controller
 {
@@ -32,6 +33,19 @@ class AuthenticatedSessionController extends Controller
         $request->authenticate();
 
         $request->session()->regenerate();
+
+        // --- TAMBAHKAN KODE INI ---
+        // Jika dari halaman login mengirimkan parameter 'locale', update user
+        if ($request->filled('locale')) {
+            $user = $request->user();
+            $user->locale = $request->locale;
+            if ($request->filled('theme')) {
+                 $user->theme = $request->theme;
+            }
+            
+            $user->save();
+        }
+        // -------------------------
 
         return redirect()->intended(route('dashboard', absolute: false));
     }

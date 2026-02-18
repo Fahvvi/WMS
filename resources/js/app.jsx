@@ -5,6 +5,7 @@ import { createInertiaApp } from '@inertiajs/react';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import { createRoot } from 'react-dom/client';
 import { AppProvider } from '@/Contexts/AppContext';
+import { LaravelReactI18nProvider } from 'laravel-react-i18n';
 
 
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
@@ -20,9 +21,13 @@ createInertiaApp({
         const root = createRoot(el);
 
         root.render(
-            <AppProvider>
+            <LaravelReactI18nProvider
+                locale={props.initialPage.props.locale || 'id'} // Gunakan 'id' sebagai fallback jika props kosong
+                fallbackLocale="id"
+                files={import.meta.glob('/lang/*.json')} 
+            >
                 <App {...props} />
-            </AppProvider>
+            </LaravelReactI18nProvider>
         );
     },
     progress: {

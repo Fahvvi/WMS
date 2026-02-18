@@ -77,11 +77,16 @@ class SettingController extends Controller
 
         $materials = Product::query()
             ->when($selectedCategory, function($q) use ($selectedCategory) {
-                $q->where('category_id', $selectedCategory); // Pastikan kolomnya category_id bukan category
+                // PERBAIKAN: Gunakan ILIKE dan tambahkan '%' di akhir string
+                // Ini akan menemukan "Elektronik" DAN "Elektronik -> Battery"
+                $q->where('category', 'ilike', $selectedCategory . '%'); 
             })
             ->when($search, function($q) use ($search) {
-                $q->where('name', 'ilike', "%{$search}%")
-                  ->orWhere('sku', 'ilike', "%{$search}%");
+                $q->where(function($subQ) use ($search) {
+                    $subQ->where('name', 'ilike', "%{$search}%")
+                         ->orWhere('sku', 'ilike', "%{$search}%")
+                         ->orWhere('barcode', 'ilike', "%{$search}%");
+                });
             })
             ->orderBy('created_at', 'desc')
             ->paginate(15)

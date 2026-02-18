@@ -1,9 +1,14 @@
 {
-    "Dashboard": "Dasbor",
+    "Dashboard": "Dashboard",
+    "Inbound": "Inbound",
+    "Outbound": "Outbound",
+    "Master Inventory": "Master Inventory",
+    "Manajemen Stok": "Manajemen Stok",
+    "Data Barang": "Data Barang",
+    "Transfer Stok": "Transfer Stok",
+    "Stock Opname": "Stock Opname",
+    "Settings": "Settings",
+    "Signed in as": "Login sebagai",
     "Profile": "Profil",
-    "Log Out": "Keluar",
-    "Business Log": "Catatan Bisnis",
-    "Inventory": "Gudang",
-    "Dark Mode": "Mode Gelap",
-    "Light Mode": "Mode Terang"
+    "Log Out": "Keluar"
 }
