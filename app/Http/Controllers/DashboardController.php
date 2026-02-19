@@ -12,30 +12,39 @@ class DashboardController extends Controller
 {
     public function index()
     {
+        $user = auth()->user();
+        
+        // Cek apakah user adalah admin (sesuaikan dengan logic role Anda, misal pakai Spatie atau kolom role)
+        // Asumsi: menggunakan Spatie $user->hasRole('Super Admin') atau kolom $user->role === 'Super Admin'
+        $isAdmin = $user->role === 'Super Admin' || ($user->roles && $user->roles->contains('name', 'Super Admin'));
+
         // 1. Data Ringkasan (Stats Cards)
         $totalProducts = Product::count();
         $totalStock = Product::withSum('stocks', 'quantity')->get()->sum('stocks_sum_quantity');
-        $lowStockCount = Product::whereHas('stocks', function($q) {
-            // Logic kasar: produk yg total stoknya <= min_stock_alert
-            // (Idealnya query ini lebih kompleks, tapi ini cukup untuk dashboard cepat)
-        })->count(); // Atau kita hitung di frontend dari data produk
 
-        // 2. 5 Transaksi Inbound Terbaru
-        $recentInbound = Transaction::with(['user', 'details.product'])
+        // 2. Transaksi Inbound 
+        // JIKA ADMIN: Ambil lebih banyak (misal 50 atau paginate) untuk tabel besar di atas
+        // JIKA STAFF: Ambil 5 saja untuk widget bawah
+        $inboundQuery = Transaction::with(['user', 'details.product'])
             ->where('type', 'inbound')
-            ->latest()
-            ->take(5)
-            ->get();
+            ->latest();
 
-        // 3. 5 Transaksi Outbound Terbaru
+        if ($isAdmin) {
+            $recentInbound = $inboundQuery->take(50)->get(); // Ambil 50 untuk Admin
+        } else {
+            $recentInbound = $inboundQuery->take(5)->get(); // Ambil 5 untuk Staff
+        }
+
+        // 3. 5 Transaksi Outbound Terbaru (Tetap 5 untuk widget bawah)
         $recentOutbound = Transaction::with(['user', 'details.product'])
             ->where('type', 'outbound')
             ->latest()
             ->take(5)
             ->get();
 
-        // 4. Daftar User (Limit 5 untuk widget)
-        $users = User::latest()->take(5)->get();
+        // 4. Daftar User untuk Widget Team
+        // Urutkan berdasarkan yang terakhir login
+        $users = User::orderByDesc('last_login_at')->take(5)->get();
 
         return Inertia::render('Dashboard', [
             'stats' => [

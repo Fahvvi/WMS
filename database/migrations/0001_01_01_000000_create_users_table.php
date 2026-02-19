@@ -21,6 +21,7 @@ return new class extends Migration
             $table->string('role')->default('staff');
             $table->string('theme')->default('light'); // light, dark, system
             $table->string('locale')->default('id');
+            $table->timestamp('last_login_at')->nullable();
             $table->rememberToken();
             $table->timestamps();
         });
