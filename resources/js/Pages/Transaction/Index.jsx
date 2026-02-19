@@ -3,7 +3,7 @@ import { Head, Link, router } from '@inertiajs/react';
 import { useState } from 'react';
 import { 
     ArrowDownLeft, ArrowUpRight, Search, Plus, 
-    Calendar, MapPin, User, Package, Tag, Clock
+    Calendar, MapPin, User, Package, Tag, Clock, Layers
 } from 'lucide-react';
 import { useLaravelReactI18n } from 'laravel-react-i18n';
 
@@ -24,9 +24,18 @@ export default function TransactionIndex({ auth, transactions, type, filters }) 
     // Helper: Ambil Kategori Unik dari Detail Transaksi
     const getCategories = (details) => {
         if (!details || details.length === 0) return '-';
-        // Ambil kategori unik saja
         const categories = [...new Set(details.map(d => d.product?.category || t('Umum')))];
         return categories.join(', ');
+    };
+
+    // Helper: Ambil Lokasi/Rak Unik dari Detail Transaksi
+    const getLocations = (details) => {
+        if (!details || details.length === 0) return [];
+        // Kumpulkan kode lokasi yang tidak null
+        const locCodes = details.map(d => d.location?.code).filter(Boolean);
+        // Buat jadi unik
+        const uniqueLocs = [...new Set(locCodes)];
+        return uniqueLocs;
     };
 
     // Helper: Format Tanggal & Waktu
@@ -83,7 +92,7 @@ export default function TransactionIndex({ auth, transactions, type, filters }) 
                             <tr>
                                 <th className="px-6 py-4 font-bold">{t('No. Transaksi')}</th>
                                 <th className="px-6 py-4 font-bold">{t('Tanggal & Waktu')}</th>
-                                <th className="px-6 py-4 font-bold">{t('Gudang')}</th>
+                                <th className="px-6 py-4 font-bold">{t('Gudang & Rak')}</th>
                                 <th className="px-6 py-4 font-bold">{t('User Input')}</th>
                                 <th className="px-6 py-4 font-bold text-center">{isInbound ? t('Qty Masuk') : t('Qty Keluar')}</th>
                                 <th className="px-6 py-4 font-bold">{t('Kategori')}</th>
@@ -92,74 +101,92 @@ export default function TransactionIndex({ auth, transactions, type, filters }) 
                         </thead>
                         <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
                             {transactions.data.length > 0 ? (
-                                transactions.data.map((trx) => (
-                                    <tr key={trx.id} className="hover:bg-slate-50 dark:hover:bg-indigo-900/10 transition-colors group">
-                                        
-                                        {/* 1. No Transaksi (SUDAH DIPERBAIKI: Link dihilangkan agar tidak Error Ziggy) */}
-                                        <td className="px-6 py-4 font-mono font-bold text-slate-800 dark:text-slate-200 whitespace-nowrap">
-                                            <span className="text-indigo-600 dark:text-indigo-400">
-                                                {trx.trx_number}
-                                            </span>
-                                        </td>
-
-                                        {/* 2. Tanggal & Waktu */}
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
-                                                <Clock className="w-4 h-4 text-slate-400 dark:text-slate-500" />
-                                                <span className="font-medium">
-                                                    {formatDateTime(trx.created_at)}
+                                transactions.data.map((trx) => {
+                                    const locations = getLocations(trx.details);
+                                    
+                                    return (
+                                        <tr key={trx.id} className="hover:bg-slate-50 dark:hover:bg-indigo-900/10 transition-colors group align-top">
+                                            
+                                            {/* 1. No Transaksi */}
+                                            <td className="px-6 py-4 font-mono font-bold text-slate-800 dark:text-slate-200 whitespace-nowrap">
+                                                <span className="text-indigo-600 dark:text-indigo-400 block mt-1">
+                                                    {trx.trx_number}
                                                 </span>
-                                            </div>
-                                        </td>
+                                            </td>
 
-                                        {/* 3. Gudang */}
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <div className="flex items-center gap-2">
-                                                <MapPin className="w-4 h-4 text-slate-400 dark:text-slate-500 shrink-0" />
-                                                <span className="truncate max-w-[150px]">{trx.warehouse?.name || '-'}</span>
-                                            </div>
-                                        </td>
-
-                                        {/* 4. User Input */}
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <div className="flex items-center gap-2">
-                                                <div className="w-6 h-6 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-xs font-bold text-slate-600 dark:text-slate-300 border border-white dark:border-slate-600 shadow-sm shrink-0">
-                                                    {trx.user?.name.charAt(0)}
+                                            {/* 2. Tanggal & Waktu */}
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300 mt-1">
+                                                    <Clock className="w-4 h-4 text-slate-400 dark:text-slate-500" />
+                                                    <span className="font-medium">
+                                                        {formatDateTime(trx.created_at)}
+                                                    </span>
                                                 </div>
-                                                <span className="font-medium truncate max-w-[120px]">{trx.user?.name}</span>
-                                            </div>
-                                        </td>
+                                            </td>
 
-                                        {/* 5. Qty Inbound / Outbound */}
-                                        <td className="px-6 py-4 text-center">
-                                            <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold shadow-sm border ${
-                                                isInbound 
-                                                ? 'bg-indigo-50 text-indigo-700 border-indigo-100 dark:bg-indigo-900/30 dark:text-indigo-400 dark:border-indigo-800/50' 
-                                                : 'bg-orange-50 text-orange-700 border-orange-100 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800/50'
-                                            }`}>
-                                                {trx.details_sum_quantity || 0} {t('Item')}
-                                            </span>
-                                        </td>
+                                            {/* 3. Gudang & Rak */}
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <MapPin className="w-4 h-4 text-slate-400 dark:text-slate-500 shrink-0" />
+                                                    <span className="font-bold text-slate-800 dark:text-slate-200 truncate max-w-[150px]">
+                                                        {trx.warehouse?.name || '-'}
+                                                    </span>
+                                                </div>
+                                                {/* Badge Rak */}
+                                                <div className="flex flex-wrap gap-1 mt-1 pl-6">
+                                                    {locations.length > 0 ? (
+                                                        locations.map((loc, idx) => (
+                                                            <span key={idx} className="flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded border border-purple-200 bg-purple-50 text-purple-700 dark:border-purple-800/50 dark:bg-purple-900/30 dark:text-purple-400">
+                                                                <Layers className="w-3 h-3" /> {loc}
+                                                            </span>
+                                                        ))
+                                                    ) : (
+                                                        <span className="text-xs text-slate-400 italic">{t('Tanpa Rak')}</span>
+                                                    )}
+                                                </div>
+                                            </td>
 
-                                        {/* 6. Category */}
-                                        <td className="px-6 py-4">
-                                            <div className="flex items-center gap-2">
-                                                <Tag className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 shrink-0" />
-                                                <span className="text-xs font-medium text-slate-600 dark:text-slate-400 line-clamp-2 max-w-[150px]">
-                                                    {getCategories(trx.details)}
+                                            {/* 4. User Input */}
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                <div className="flex items-center gap-2 mt-1">
+                                                    <div className="w-6 h-6 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-xs font-bold text-slate-600 dark:text-slate-300 border border-white dark:border-slate-600 shadow-sm shrink-0">
+                                                        {trx.user?.name.charAt(0)}
+                                                    </div>
+                                                    <span className="font-medium truncate max-w-[120px]">{trx.user?.name}</span>
+                                                </div>
+                                            </td>
+
+                                            {/* 5. Qty Inbound / Outbound */}
+                                            <td className="px-6 py-4 text-center">
+                                                <span className={`mt-1 inline-flex items-center px-3 py-1 rounded-full text-xs font-bold shadow-sm border ${
+                                                    isInbound 
+                                                    ? 'bg-indigo-50 text-indigo-700 border-indigo-100 dark:bg-indigo-900/30 dark:text-indigo-400 dark:border-indigo-800/50' 
+                                                    : 'bg-orange-50 text-orange-700 border-orange-100 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800/50'
+                                                }`}>
+                                                    {trx.details_sum_quantity || 0} {t('Item')}
                                                 </span>
-                                            </div>
-                                        </td>
+                                            </td>
 
-                                        {/* 7. Status */}
-                                        <td className="px-6 py-4 text-center">
-                                            <span className="px-2 py-1 text-[10px] uppercase tracking-wider font-bold text-emerald-700 bg-emerald-100 dark:text-emerald-400 dark:bg-emerald-900/30 rounded-md border border-emerald-200 dark:border-emerald-800/50">
-                                                {t(trx.status || 'Completed')}
-                                            </span>
-                                        </td>
+                                            {/* 6. Category */}
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center gap-2 mt-1">
+                                                    <Tag className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 shrink-0" />
+                                                    <span className="text-xs font-medium text-slate-600 dark:text-slate-400 line-clamp-2 max-w-[150px]">
+                                                        {getCategories(trx.details)}
+                                                    </span>
+                                                </div>
+                                            </td>
 
-                                    </tr>
-                                ))
+                                            {/* 7. Status */}
+                                            <td className="px-6 py-4 text-center">
+                                                <span className="mt-1 inline-block px-2 py-1 text-[10px] uppercase tracking-wider font-bold text-emerald-700 bg-emerald-100 dark:text-emerald-400 dark:bg-emerald-900/30 rounded-md border border-emerald-200 dark:border-emerald-800/50">
+                                                    {t(trx.status || 'Completed')}
+                                                </span>
+                                            </td>
+
+                                        </tr>
+                                    );
+                                })
                             ) : (
                                 <tr>
                                     <td colSpan="7" className="px-6 py-16 text-center text-slate-400 dark:text-slate-500">

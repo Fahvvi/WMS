@@ -15,6 +15,7 @@ return new class extends Migration
         $table->id();
         $table->foreignId('transaction_id')->constrained()->cascadeOnDelete();
         $table->foreignId('product_id')->constrained();
+        $table->foreignId('location_id')->nullable()->constrained('locations')->nullOnDelete();
         $table->integer('quantity'); // Jumlah barang dipindah
         $table->timestamps();
     });

@@ -14,7 +14,8 @@ class TransactionDetail extends Model
     protected $fillable = [
         'transaction_id',
         'product_id',
-        'quantity'
+        'location_id',
+        'quantity',
     ];
     public function getActivitylogOptions(): LogOptions
     {
@@ -35,5 +36,9 @@ class TransactionDetail extends Model
     public function transaction()
     {
         return $this->belongsTo(Transaction::class);
+    }
+    public function location()
+    {
+        return $this->belongsTo(Location::class, 'location_id');
     }
 }

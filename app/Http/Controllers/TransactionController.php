@@ -34,7 +34,7 @@ class TransactionController extends Controller
         }
 
         $transactions = Transaction::with(['user', 'warehouse'])
-            ->with(['details.product']) 
+            ->with(['details.product','details.location']) 
             ->withSum('details', 'quantity') 
             ->where('type', $type)
             ->when($query, function ($q) use ($query) {
@@ -178,6 +178,7 @@ class TransactionController extends Controller
                     'transaction_id' => $transaction->id,
                     'product_id' => $item['product_id'],
                     'quantity' => $item['quantity'],
+                    'location_id' => $locationId 
                 ]);
 
                 $stock = Stock::where('product_id', $item['product_id'])
