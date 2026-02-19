@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Product;
 use App\Models\Stock;
 use App\Models\Transaction;
+use App\Models\Location; 
 use App\Models\TransactionDetail;
 use App\Models\Warehouse;
 use App\Models\Unit; 
@@ -21,8 +22,7 @@ class TransactionController extends Controller
         $type = $request->input('type', 'inbound');
         $query = $request->input('search');
 
-        // --- SECURITY CHECK (CEGAH AKSES URL LANGSUNG) ---
-        // Jika user memaksa ganti URL ?type=outbound padahal tidak punya izin, kita tolak.
+        // --- SECURITY CHECK ---
         if ($type === 'inbound') {
             if (!auth()->user()->can('view_inbound')) {
                 abort(403, 'ANDA TIDAK MEMILIKI AKSES KE HALAMAN INBOUND.');
@@ -32,7 +32,6 @@ class TransactionController extends Controller
                 abort(403, 'ANDA TIDAK MEMILIKI AKSES KE HALAMAN OUTBOUND.');
             }
         }
-        // ------------------------------------------------
 
         $transactions = Transaction::with(['user', 'warehouse'])
             ->with(['details.product']) 
@@ -56,7 +55,7 @@ class TransactionController extends Controller
     {
         $type = $request->query('type', 'inbound'); 
 
-        // --- SECURITY CHECK (CEGAH AKSES FORM) ---
+        // --- SECURITY CHECK ---
         if ($type === 'inbound') {
             if (!auth()->user()->can('create_inbound')) {
                 abort(403, 'ANDA TIDAK BERHAK MEMBUAT TRANSAKSI INBOUND.');
@@ -66,9 +65,8 @@ class TransactionController extends Controller
                 abort(403, 'ANDA TIDAK BERHAK MEMBUAT TRANSAKSI OUTBOUND.');
             }
         }
-        // -----------------------------------------
 
-        // Logic Generate Nomor Transaksi 'TRX-YYYYMMDD-XXXX'
+        // Logic Generate Nomor Transaksi
         $today = date('Ymd');
         $prefix = 'TRX-' . $today . '-'; 
         
@@ -87,15 +85,35 @@ class TransactionController extends Controller
         return Inertia::render('Transaction/Create', [
             'type' => $type,
             'newTrxNumber' => $newTrxNumber,
-            'warehouses' => Warehouse::all(),
+            // [UPDATED] TAMBAHKAN with('locations') AGAR BISA MUNCUL DI DROPDOWN
+            'warehouses' => Warehouse::with('locations')->get(),
             'units' => Unit::orderBy('name')->pluck('short_name'), 
             'categories' => \App\Models\Category::orderBy('name')->get(),
         ]);
     }
 
+    public function checkLocation(Request $request)
+    {
+        $code = $request->code;
+        $warehouseId = $request->warehouse_id;
+
+        $query = Location::with('warehouse')->where('code', 'ilike', $code);
+
+        if ($warehouseId) {
+            $query->where('warehouse_id', $warehouseId);
+        }
+
+        $location = $query->first();
+
+        if ($location) {
+            return response()->json(['status' => 'found', 'location' => $location, 'warehouse' => $location->warehouse]);
+        }
+
+        return response()->json(['status' => 'not_found'], 404);
+    }
+
     public function store(Request $request)
     {
-        // Validasi Input
         $request->validate([
             'type' => 'required|in:inbound,outbound',
             'trx_number' => 'required|string|unique:transactions,trx_number',
@@ -104,41 +122,45 @@ class TransactionController extends Controller
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|exists:products,id',
             'items.*.quantity' => 'required|integer|min:1',
+            'items.*.location_id' => 'nullable|exists:locations,id', 
         ]);
 
-        // --- SECURITY CHECK (BACKEND VALIDATION) ---
-        // Mencegah manipulasi request via Inspect Element / Postman
         if ($request->type === 'inbound' && !auth()->user()->can('create_inbound')) {
             abort(403, 'TINDAKAN DITOLAK: TIDAK ADA IZIN CREATE INBOUND');
         }
         if ($request->type === 'outbound' && !auth()->user()->can('create_outbound')) {
             abort(403, 'TINDAKAN DITOLAK: TIDAK ADA IZIN CREATE OUTBOUND');
         }
-        // -------------------------------------------
 
         try {
             DB::beginTransaction();
 
-            // Validasi Stok untuk OUTBOUND
             if ($request->type === 'outbound') {
                 foreach ($request->items as $item) {
-                    $currentStock = Stock::where('product_id', $item['product_id'])
-                        ->where('warehouse_id', $request->warehouse_id)
-                        ->value('quantity'); 
+                    $locationId = $item['location_id'] ?? null;
 
-                    $currentStock = $currentStock ?? 0;
+                    $stockQuery = Stock::where('product_id', $item['product_id'])
+                        ->where('warehouse_id', $request->warehouse_id);
+                    
+                    if ($locationId) {
+                        $stockQuery->where('location_id', $locationId);
+                    } else {
+                        $stockQuery->whereNull('location_id');
+                    }
+
+                    $currentStock = $stockQuery->value('quantity') ?? 0;
 
                     if ($currentStock < $item['quantity']) {
                         $productName = Product::find($item['product_id'])->name;
+                        $locMsg = $locationId ? " di lokasi ID #$locationId" : ""; 
                         
                         throw ValidationException::withMessages([
-                            'items' => "Stok '$productName' di gudang ini tidak cukup. Sisa: $currentStock, Diminta: {$item['quantity']}"
+                            'items' => "Stok '$productName'$locMsg tidak cukup. Sisa: $currentStock, Diminta: {$item['quantity']}"
                         ]);
                     }
                 }
             }
 
-            // Simpan Header Transaksi
             $transaction = Transaction::create([
                 'user_id' => auth()->id(),
                 'warehouse_id' => $request->warehouse_id,
@@ -149,27 +171,35 @@ class TransactionController extends Controller
                 'status' => 'completed', 
             ]);
 
-            // Loop Items & Update Stock
             foreach ($request->items as $item) {
-                
+                $locationId = $item['location_id'] ?? null;
+
                 TransactionDetail::create([
                     'transaction_id' => $transaction->id,
                     'product_id' => $item['product_id'],
                     'quantity' => $item['quantity'],
                 ]);
 
+                $stock = Stock::where('product_id', $item['product_id'])
+                    ->where('warehouse_id', $request->warehouse_id)
+                    ->where('location_id', $locationId)
+                    ->first();
+
                 if ($request->type === 'inbound') {
-                    // Inbound: Tambah Stok
-                    $stock = Stock::firstOrCreate(
-                        ['product_id' => $item['product_id'], 'warehouse_id' => $request->warehouse_id],
-                        ['quantity' => 0]
-                    );
-                    $stock->increment('quantity', $item['quantity']);
+                    if ($stock) {
+                        $stock->increment('quantity', $item['quantity']);
+                    } else {
+                        Stock::create([
+                            'product_id' => $item['product_id'],
+                            'warehouse_id' => $request->warehouse_id,
+                            'location_id' => $locationId, 
+                            'quantity' => $item['quantity']
+                        ]);
+                    }
                 } else {
-                    // Outbound: Kurangi Stok
-                    Stock::where('product_id', $item['product_id'])
-                        ->where('warehouse_id', $request->warehouse_id)
-                        ->decrement('quantity', $item['quantity']);
+                    if ($stock) {
+                        $stock->decrement('quantity', $item['quantity']);
+                    }
                 }
             }
 
@@ -180,7 +210,6 @@ class TransactionController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
-            
             if ($e instanceof ValidationException) {
                 throw $e;
             }

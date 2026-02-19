@@ -15,11 +15,12 @@ return new class extends Migration
         $table->id();
         $table->foreignId('warehouse_id')->constrained()->cascadeOnDelete();
         $table->foreignId('product_id')->constrained()->cascadeOnDelete();
+        $table->foreignId('location_id')->nullable()->constrained('locations')->nullOnDelete();
         $table->integer('quantity')->default(0);
         $table->timestamps();
 
         // Mencegah duplikasi: 1 produk hanya punya 1 record stok di 1 gudang yang sama
-        $table->unique(['warehouse_id', 'product_id']);
+        $table->unique(['warehouse_id', 'product_id', 'location_id']);
     });
     }
 

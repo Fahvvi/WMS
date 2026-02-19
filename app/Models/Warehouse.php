@@ -17,6 +17,14 @@ class Warehouse extends Model
         'city',
         'is_active'
     ];
+    public function locations()
+    {
+        return $this->hasMany(Location::class);
+    }
+    public function stocks()
+    {
+        return $this->hasMany(Stock::class);
+    }
 
     public function getActivitylogOptions(): LogOptions
     {

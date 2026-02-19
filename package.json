@@ -25,6 +25,7 @@
         "html5-qrcode": "^2.3.8",
         "laravel-react-i18n": "^2.0.5",
         "lucide-react": "^0.563.0",
+        "qrcode.react": "^4.2.0",
         "react-hot-toast": "^2.6.0",
         "sweetalert2": "^11.26.18",
         "sweetalert2-react-content": "^5.1.1",

@@ -13,6 +13,7 @@ class WarehouseController extends Controller
         $query = $request->input('search');
 
         $warehouses = Warehouse::query()
+            ->with('locations')
             ->when($query, function ($q) use ($query) {
                 $q->where('name', 'ilike', "%{$query}%")
                   ->orWhere('code', 'ilike', "%{$query}%")
@@ -22,8 +23,12 @@ class WarehouseController extends Controller
             ->paginate(10)
             ->withQueryString();
 
-        return Inertia::render('Warehouse/Index', [
+        // Ambil data Unit juga karena props 'units' dibutuhkan di Warehouse.jsx
+        $units = \App\Models\Unit::orderBy('name')->get(); 
+
+        return Inertia::render('Settings/Warehouse', [ // Pastikan path folder React benar (Settings atau Warehouse?)
             'warehouses' => $warehouses,
+            'units' => $units, // <--- Kirim units
             'filters' => $request->only(['search']),
         ]);
     }
@@ -31,7 +36,7 @@ class WarehouseController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'code' => 'required|string|unique:warehouses,code|max:20', // Kode harus unik!
+            'code' => 'required|string|unique:warehouses,code|max:20',
             'name' => 'required|string|max:255',
             'address' => 'nullable|string',
             'city' => 'nullable|string|max:100',
@@ -59,6 +64,7 @@ class WarehouseController extends Controller
 
     public function destroy(Warehouse $warehouse)
     {
+        // Opsional: Cek relasi sebelum delete
         $warehouse->delete();
         return redirect()->back()->with('success', 'Gudang dihapus.');
     }

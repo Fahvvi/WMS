@@ -13,6 +13,7 @@ use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\BusinessLogController;
 use Illuminate\Foundation\Application;
+use App\Http\Controllers\LocationController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\StockOpnameController;
 use Inertia\Inertia;
@@ -99,7 +100,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/', [TransactionController::class, 'index'])->name('index');
         Route::get('/create', [TransactionController::class, 'create'])->name('create');
         Route::post('/', [TransactionController::class, 'store'])->name('store');
+        Route::get('/locations/check', [\App\Http\Controllers\TransactionController::class, 'checkLocation'])->name('locations.check');
+
     });
+
+    Route::resource('locations', LocationController::class)->only(['store', 'update', 'destroy']);
 
 
     // =========================================================================
@@ -119,7 +124,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         // C. GUDANG (Tampilan View di Menu Settings)
         // Permission check (manage_warehouses) handled inside SettingController
-        Route::get('/warehouses', [SettingController::class, 'warehouseIndex'])->name('warehouses.index');
+        Route::get('/warehouses', [WarehouseController::class, 'index'])->name('warehouses.index');
 
         // D. MANAJEMEN USER (RBAC) - KHUSUS SUPER ADMIN
         Route::resource('users', UserController::class)

@@ -33,4 +33,8 @@ class Stock extends Model
     {
         return $this->belongsTo(Warehouse::class);
     }
+    public function location() 
+    { 
+        return $this->belongsTo(Location::class); 
+    }
 }
