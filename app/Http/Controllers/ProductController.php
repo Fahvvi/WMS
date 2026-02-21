@@ -20,24 +20,26 @@ class ProductController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Product::query();
+        $query = $request->input('search');
 
-        if ($request->search) {
-            $query->where('name', 'ilike', "%{$request->search}%")
-                  ->orWhere('sku', 'ilike', "%{$request->search}%");
-        }
-
-        // UPDATE DI SINI: Tambahkan with('stocks.warehouse')
-        $products = $query->with(['stocks.warehouse']) 
+        $products = Product::query()
+            // 1. Ambil relasi stocks dan location-nya
+            ->with(['stocks.location', 'stocks.warehouse']) 
+            // 2. Hitung total qty (ini sepertinya sudah ada di kode Anda)
+            ->withSum('stocks as stocks_sum_quantity', 'quantity') 
+            ->when($query, function ($q) use ($query) {
+                $q->where('name', 'ilike', "%{$query}%")
+                  ->orWhere('sku', 'ilike', "%{$query}%")
+                  ->orWhere('barcode', 'ilike', "%{$query}%")
+                  ->orWhere('category', 'ilike', "%{$query}%");
+            })
             ->orderBy('created_at', 'desc')
-            ->paginate(10)
+            ->paginate(15)
             ->withQueryString();
 
-        return Inertia::render('Product/Index', [
+        return Inertia::render('Product/Index', [ // Sesuaikan path render Anda
             'products' => $products,
             'filters' => $request->only(['search']),
-            'categories' => Category::orderBy('name')->get(),
-            'units' => Unit::orderBy('name')->get(),
         ]);
     }
 

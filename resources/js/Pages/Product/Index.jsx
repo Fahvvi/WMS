@@ -1,12 +1,12 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, router } from '@inertiajs/react';
-import { Plus, Search, Package, Edit, Trash2, Eye, X, Warehouse, Printer, History, Download } from 'lucide-react';
+import { Plus, Search, Package, Edit, Trash2, Eye, X, Warehouse, Printer, History, Download, Layers, MapPin } from 'lucide-react';
 import { useState } from 'react';
 import Swal from 'sweetalert2';
-import { useLaravelReactI18n } from 'laravel-react-i18n'; // <--- IMPORT I18N
+import { useLaravelReactI18n } from 'laravel-react-i18n'; 
 
 export default function ProductIndex({ auth, products, filters }) {
-    const { t } = useLaravelReactI18n(); // <--- INISIALISASI I18N
+    const { t } = useLaravelReactI18n(); 
     const [searchTerm, setSearchTerm] = useState(filters.search || '');
     
     // State untuk Modal Detail Stok
@@ -31,8 +31,6 @@ export default function ProductIndex({ auth, products, filters }) {
             confirmButtonColor: '#ef4444',
             confirmButtonText: t('Ya, Hapus!'),
             cancelButtonText: t('Batal'),
-            // Tambahkan styling khusus untuk SweetAlert jika diinginkan di app.css, 
-            // namun bawaan SweetAlert biasanya tetap menggunakan warna terang (light) by default.
         }).then((result) => {
             if (result.isConfirmed) {
                 router.delete(route('products.destroy', id));
@@ -40,7 +38,7 @@ export default function ProductIndex({ auth, products, filters }) {
         });
     };
 
-    // Fungsi Buka Modal
+    // Fungsi Buka Modal Detail Stok
     const openStockModal = (product) => {
         setSelectedProduct(product);
         setIsModalOpen(true);
@@ -102,7 +100,7 @@ export default function ProductIndex({ auth, products, filters }) {
                         </div>
 
                         {/* Table */}
-                        <div className="overflow-x-auto">
+                        <div className="overflow-x-auto min-h-[50vh]">
                             <table className="w-full text-sm text-left text-slate-600 dark:text-slate-300">
                                 <thead className="text-xs text-slate-500 dark:text-slate-400 uppercase bg-slate-50 dark:bg-slate-700/50 border-b border-slate-100 dark:border-slate-700">
                                     <tr>
@@ -115,8 +113,9 @@ export default function ProductIndex({ auth, products, filters }) {
                                 <tbody className="divide-y divide-slate-100 dark:divide-slate-700/80">
                                     {products.data.length > 0 ? (
                                         products.data.map((product) => {
-                                            // Hitung Total Stok dari semua gudang
-                                            const totalStock = product.stocks ? product.stocks.reduce((acc, stock) => acc + stock.quantity, 0) : 0;
+                                            // Hitung Total Stok dari semua gudang/rak
+                                            const totalStock = product.stocks_sum_quantity || 0;
+                                            const isLowStock = totalStock <= product.min_stock_alert;
 
                                             return (
                                                 <tr key={product.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
@@ -132,18 +131,18 @@ export default function ProductIndex({ auth, products, filters }) {
                                                         </span>
                                                     </td>
                                                     <td className="px-6 py-4 text-center">
-                                                        <div className={`font-bold text-base ${totalStock > 0 ? 'text-slate-800 dark:text-slate-200' : 'text-red-500 dark:text-red-400'}`}>
+                                                        <div className={`font-bold text-base ${isLowStock ? 'text-red-500 dark:text-red-400' : 'text-slate-800 dark:text-slate-200'}`}>
                                                             {totalStock}
                                                         </div>
-                                                        <div className="text-xs text-slate-400 dark:text-slate-500">{product.unit}</div>
+                                                        <div className="text-xs text-slate-400 dark:text-slate-500 uppercase">{product.unit}</div>
                                                     </td>
                                                     <td className="px-6 py-4 text-right">
                                                         <div className="flex justify-end gap-2">
-                                                            {/* Tombol Lihat Stok (Detail) */}
+                                                            {/* Tombol Lihat Stok (Detail Rak) */}
                                                             <button 
                                                                 onClick={() => openStockModal(product)} 
                                                                 className="p-2 text-indigo-500 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-900/30 rounded-lg transition border border-transparent hover:border-indigo-200 dark:hover:border-indigo-700"
-                                                                title={t('Lihat Detail Stok per Gudang')}
+                                                                title={t('Lihat Detail Stok per Lokasi')}
                                                             >
                                                                 <Eye className="w-4 h-4" />
                                                             </button>
@@ -177,7 +176,7 @@ export default function ProductIndex({ auth, products, filters }) {
                                             );
                                         })
                                     ) : (
-                                        <tr><td colSpan="4" className="px-6 py-8 text-center text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-slate-800/50">{t('Belum ada data barang.')}</td></tr>
+                                        <tr><td colSpan="4" className="px-6 py-12 text-center text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-slate-800/50">{t('Belum ada data barang.')}</td></tr>
                                     )}
                                 </tbody>
                             </table>
@@ -185,22 +184,25 @@ export default function ProductIndex({ auth, products, filters }) {
 
                         {/* Pagination */}
                         {products.links && products.data.length > 0 && (
-                            <div className="px-6 py-4 border-t border-slate-100 dark:border-slate-700 flex justify-center bg-white dark:bg-slate-800 transition-colors">
+                            <div className="px-6 py-4 border-t border-slate-100 dark:border-slate-700 flex justify-between items-center bg-white dark:bg-slate-800 transition-colors">
+                                <div className="text-xs text-slate-500 dark:text-slate-400">
+                                    {t('Halaman')} {products.current_page} {t('dari')} {products.last_page}
+                                </div>
                                 <div className="flex gap-1 flex-wrap justify-center">
                                     {products.links.map((link, i) => (
                                         link.url ? (
                                             <Link 
                                                 key={i} 
                                                 href={link.url} 
-                                                className={`px-3 py-1 text-sm rounded-md transition-colors ${
+                                                className={`px-3 py-1 text-sm rounded-md transition-colors border ${
                                                     link.active 
-                                                    ? 'bg-indigo-600 text-white dark:bg-indigo-500' 
-                                                    : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
+                                                    ? 'bg-indigo-600 border-indigo-600 text-white dark:bg-indigo-500 dark:border-indigo-500' 
+                                                    : 'bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'
                                                 }`} 
                                                 dangerouslySetInnerHTML={{ __html: link.label }} 
                                             />
                                         ) : (
-                                            <span key={i} className="px-3 py-1 text-sm text-slate-300 dark:text-slate-600" dangerouslySetInnerHTML={{ __html: link.label }}></span>
+                                            <span key={i} className="px-3 py-1 text-sm text-slate-300 dark:text-slate-600 border border-transparent" dangerouslySetInnerHTML={{ __html: link.label }}></span>
                                         )
                                     ))}
                                 </div>
@@ -209,72 +211,82 @@ export default function ProductIndex({ auth, products, filters }) {
                     </div>
                 </div>
 
-                {/* --- MODAL DETAIL STOK --- */}
+                {/* --- MODAL DETAIL STOK (UPDATED UNTUK RAK) --- */}
                 {isModalOpen && selectedProduct && (
                     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 dark:bg-slate-900/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-                        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-transparent dark:border-slate-700 transition-colors">
+                        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-transparent dark:border-slate-700 transition-colors flex flex-col max-h-[85vh]">
                             
                             {/* Modal Header */}
-                            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-800/80">
+                            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-800/80 shrink-0">
                                 <div>
-                                    <h3 className="font-bold text-lg text-slate-800 dark:text-slate-200">{selectedProduct.name}</h3>
-                                    <p className="text-xs text-slate-500 dark:text-slate-400 font-mono">{selectedProduct.sku}</p>
+                                    <h3 className="font-bold text-lg text-slate-800 dark:text-slate-200 pr-4">{selectedProduct.name}</h3>
+                                    <div className="flex items-center gap-2 mt-1">
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 font-mono bg-slate-200 dark:bg-slate-700 px-2 rounded">{selectedProduct.sku}</p>
+                                    </div>
                                 </div>
                                 <button onClick={() => setIsModalOpen(false)} className="p-1 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
                                     <X className="w-5 h-5 text-slate-500 dark:text-slate-400" />
                                 </button>
                             </div>
 
-                            {/* Modal Body (List Gudang) */}
-                            <div className="p-0 max-h-[60vh] overflow-y-auto">
+                            {/* Modal Body (List Gudang & Rak) */}
+                            <div className="p-4 overflow-y-auto custom-scrollbar">
                                 {(() => {
-                                    // FILTER: Hanya tampilkan gudang yang stoknya > 0
+                                    // FILTER: Hanya tampilkan stok yang > 0
                                     const activeStocks = selectedProduct.stocks ? selectedProduct.stocks.filter(s => s.quantity > 0) : [];
 
                                     if (activeStocks.length > 0) {
                                         return (
-                                            <div className="divide-y divide-slate-100 dark:divide-slate-700/50">
+                                            <div className="space-y-3">
+                                                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 px-1">
+                                                    {t('Rincian Lokasi Penyimpanan')}
+                                                </p>
                                                 {activeStocks.map((stock, idx) => (
-                                                    <div key={idx} className="px-6 py-4 flex justify-between items-center hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
-                                                        <div className="flex items-center gap-3">
-                                                            <div className="p-2 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-lg">
-                                                                <Warehouse className="w-5 h-5" />
+                                                    <div key={idx} className="p-4 flex justify-between items-center bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm hover:border-indigo-300 dark:hover:border-indigo-600 transition-colors">
+                                                        <div className="flex items-start gap-3">
+                                                            <div className="p-2 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-lg mt-0.5">
+                                                                <MapPin className="w-5 h-5" />
                                                             </div>
                                                             <div>
-                                                                <p className="font-bold text-sm text-slate-700 dark:text-slate-200">{stock.warehouse?.name || t('Unknown Warehouse')}</p>
-                                                                <p className="text-xs text-slate-400 dark:text-slate-500">{stock.warehouse?.code}</p>
+                                                                <p className="font-bold text-sm text-slate-800 dark:text-slate-200">
+                                                                    {stock.warehouse?.name || t('Unknown Warehouse')}
+                                                                </p>
+                                                                {/* TAMPILAN RAK */}
+                                                                <div className="flex items-center gap-1 mt-1 text-xs font-mono font-medium text-slate-500 dark:text-slate-400">
+                                                                    <Layers className="w-3.5 h-3.5 text-purple-500" /> 
+                                                                    {stock.location?.code ? `Rak: ${stock.location.code}` : <span className="italic">{t('Tanpa Rak')}</span>}
+                                                                </div>
                                                             </div>
                                                         </div>
-                                                        <div className="text-right">
-                                                            <p className="text-lg font-bold text-slate-800 dark:text-slate-200">{stock.quantity}</p>
-                                                            <p className="text-[10px] uppercase text-slate-400 dark:text-slate-500 font-bold">{selectedProduct.unit}</p>
+                                                        <div className="text-right bg-indigo-50/50 dark:bg-indigo-900/40 border border-indigo-100 dark:border-indigo-800/50 px-4 py-2 rounded-lg">
+                                                            <p className="text-xl font-bold text-indigo-700 dark:text-indigo-400 leading-none">{stock.quantity}</p>
+                                                            <p className="text-[10px] uppercase text-indigo-400 dark:text-indigo-500 font-bold mt-1">{selectedProduct.unit}</p>
                                                         </div>
                                                     </div>
                                                 ))}
-                                                
-                                                {/* Total Row */}
-                                                <div className="px-6 py-3 bg-indigo-50 dark:bg-indigo-900/20 flex justify-between items-center border-t border-indigo-100 dark:border-indigo-800/50">
-                                                    <span className="font-bold text-indigo-800 dark:text-indigo-300 text-sm">{t('TOTAL STOK')}</span>
-                                                    <span className="font-bold text-indigo-800 dark:text-indigo-300 text-lg">
-                                                        {activeStocks.reduce((a, b) => a + b.quantity, 0)} <span className="text-sm">{selectedProduct.unit}</span>
-                                                    </span>
-                                                </div>
                                             </div>
                                         );
                                     } else {
                                         return (
-                                            <div className="p-8 text-center text-slate-400 dark:text-slate-500">
-                                                <Warehouse className="w-12 h-12 mx-auto mb-2 opacity-20" />
-                                                <p>{t('Stok Habis (0) di semua gudang.')}</p>
+                                            <div className="py-12 text-center text-slate-400 dark:text-slate-500">
+                                                <Warehouse className="w-12 h-12 mx-auto mb-3 opacity-20" />
+                                                <p className="font-medium">{t('Stok Habis (0)')}</p>
+                                                <p className="text-xs mt-1">{t('Barang ini tidak tersedia di gudang manapun.')}</p>
                                             </div>
                                         );
                                     }
                                 })()}
                             </div>
 
-                            {/* Modal Footer */}
-                            <div className="p-4 border-t border-slate-100 dark:border-slate-700 flex justify-end bg-white dark:bg-slate-800">
-                                <button onClick={() => setIsModalOpen(false)} className="px-4 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-bold rounded-lg text-sm transition-colors">
+                            {/* Modal Footer (Total Summary) */}
+                            <div className="p-4 border-t border-slate-100 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-800/80 shrink-0">
+                                <div className="flex flex-col">
+                                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">{t('TOTAL KESELURUHAN')}</span>
+                                    <span className="font-bold text-indigo-700 dark:text-indigo-400 text-xl">
+                                        {selectedProduct.stocks_sum_quantity || 0} <span className="text-sm font-normal uppercase text-slate-500">{selectedProduct.unit}</span>
+                                    </span>
+                                </div>
+                                <button onClick={() => setIsModalOpen(false)} className="px-5 py-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-bold rounded-xl text-sm transition-colors">
                                     {t('Tutup')}
                                 </button>
                             </div>
