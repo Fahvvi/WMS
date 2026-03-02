@@ -15,6 +15,8 @@ class StockTransferDetail extends Model
     protected $fillable = [
         'stock_transfer_id',
         'product_id',
+        'from_location_id',
+        'to_location_id',
         'quantity',
     ];
 
@@ -35,6 +37,16 @@ class StockTransferDetail extends Model
     public function product()
     {
         return $this->belongsTo(Product::class);
+    }
+
+    public function fromLocation()
+    {
+        return $this->belongsTo(Location::class, 'from_location_id');
+    }
+
+    public function toLocation()
+    {
+        return $this->belongsTo(Location::class, 'to_location_id');
     }
     
 }

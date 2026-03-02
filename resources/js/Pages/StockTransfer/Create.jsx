@@ -1,16 +1,18 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, useForm, Link } from '@inertiajs/react';
 import { useState, useEffect } from 'react';
-import { ArrowLeft, ArrowRightLeft, Warehouse, Save, Plus, Trash2, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import { ArrowLeft, ArrowRightLeft, ArrowRight, Warehouse, Save, Plus, Trash2, CheckCircle2, AlertCircle, Loader2, Layers } from 'lucide-react';
 import TextInput from '@/Components/TextInput';
 import InputLabel from '@/Components/InputLabel';
 import InputError from '@/Components/InputError';
 import Swal from 'sweetalert2';
-import { useLaravelReactI18n } from 'laravel-react-i18n'; // <--- IMPORT I18N
+import { useLaravelReactI18n } from 'laravel-react-i18n'; 
 
 export default function StockTransferCreate({ auth, newTransferNumber, warehouses }) {
-    const { t } = useLaravelReactI18n(); // <--- INISIALISASI I18N
-    const [lines, setLines] = useState([{ product_id: '', quantity: 1 }]);
+    const { t } = useLaravelReactI18n(); 
+    
+    // Format lines: product_id, from_location_id, to_location_id, quantity
+    const [lines, setLines] = useState([{ stock_id: '', product_id: '', from_location_id: '', to_location_id: '', quantity: 1 }]);
     const [availableProducts, setAvailableProducts] = useState([]); 
     const [isLoadingProducts, setIsLoadingProducts] = useState(false);
 
@@ -27,7 +29,7 @@ export default function StockTransferCreate({ auth, newTransferNumber, warehouse
     useEffect(() => {
         if (data.from_warehouse_id) {
             setIsLoadingProducts(true);
-            setLines([{ product_id: '', quantity: 1 }]); // Reset baris item saat ganti gudang
+            setLines([{ stock_id: '', product_id: '', from_location_id: '', to_location_id: '', quantity: 1 }]); 
             
             window.axios.get(route('stock-transfers.get-stocks', data.from_warehouse_id))
                 .then(response => {
@@ -47,14 +49,31 @@ export default function StockTransferCreate({ auth, newTransferNumber, warehouse
     // Handle Perubahan di Baris Item
     const handleLineChange = (index, field, value) => {
         const newLines = [...lines];
-        newLines[index][field] = value;
+
+        // Jika user memilih produk (stock_id) dari dropdown
+        if (field === 'stock_id') {
+            const selectedStock = availableProducts.find(p => p.stock_id == value);
+            if (selectedStock) {
+                newLines[index].stock_id = selectedStock.stock_id;
+                newLines[index].product_id = selectedStock.product_id;
+                newLines[index].from_location_id = selectedStock.location_id; // Set lokasi asal sesuai data stok
+                // Reset qty to 1 when changing product
+                newLines[index].quantity = 1;
+            } else {
+                newLines[index].stock_id = '';
+                newLines[index].product_id = '';
+                newLines[index].from_location_id = '';
+            }
+        } else {
+            newLines[index][field] = value;
+        }
+
         setLines(newLines);
-        // Penting: Update data form inertia juga agar sinkron
         setData('items', newLines);
     };
 
     const addLine = () => {
-        const newLines = [...lines, { product_id: '', quantity: 1 }];
+        const newLines = [...lines, { stock_id: '', product_id: '', from_location_id: '', to_location_id: '', quantity: 1 }];
         setLines(newLines);
         setData('items', newLines);
     };
@@ -75,14 +94,20 @@ export default function StockTransferCreate({ auth, newTransferNumber, warehouse
             return Swal.fire(t('Error'), t('Pilih Gudang Asal dan Tujuan!'), 'error');
         }
         
-        if (data.from_warehouse_id === data.to_warehouse_id) {
-            return Swal.fire(t('Error'), t('Gudang Asal dan Tujuan tidak boleh sama!'), 'error');
-        }
-
         // Cek apakah ada produk yang belum dipilih (kosong)
         const hasEmptyProduct = lines.some(line => !line.product_id);
         if (hasEmptyProduct) {
             return Swal.fire(t('Error'), t('Pastikan semua baris produk telah dipilih.'), 'error');
+        }
+
+        // Cek pemindahan ke titik yang sama persis
+        const hasSameLocation = lines.some(line => 
+            data.from_warehouse_id === data.to_warehouse_id && 
+            line.from_location_id === line.to_location_id
+        );
+        
+        if (hasSameLocation) {
+            return Swal.fire(t('Perhatian'), t('Anda memindahkan barang ke Gudang dan Rak yang sama persis. Harap ubah Rak Tujuan jika mutasi dalam satu gudang.'), 'warning');
         }
 
         Swal.fire({
@@ -99,9 +124,6 @@ export default function StockTransferCreate({ auth, newTransferNumber, warehouse
                 data.items = lines; 
                 
                 post(route('stock-transfers.store'), {
-                    onSuccess: () => {
-                        // Sukses akan redirect oleh controller
-                    },
                     onError: (err) => {
                         console.error("Validation Errors:", err);
                         const firstErrorMessage = Object.values(err)[0];
@@ -115,6 +137,13 @@ export default function StockTransferCreate({ auth, newTransferNumber, warehouse
                 });
             }
         });
+    };
+
+    // Helper untuk mengambil daftar Rak di Gudang Tujuan
+    const getDestinationLocations = () => {
+        if (!data.to_warehouse_id) return [];
+        const toWarehouse = warehouses.find(w => w.id == data.to_warehouse_id);
+        return toWarehouse ? toWarehouse.locations || [] : [];
     };
 
     return (
@@ -197,7 +226,7 @@ export default function StockTransferCreate({ auth, newTransferNumber, warehouse
                                         </div>
                                         {data.from_warehouse_id && (
                                             <p className="text-xs text-indigo-600 dark:text-indigo-400 mt-2 flex items-center gap-1 animate-in fade-in slide-in-from-top-1">
-                                                <CheckCircle2 className="w-3.5 h-3.5" /> {t('Stok produk dimuat otomatis.')}
+                                                <CheckCircle2 className="w-3.5 h-3.5" /> {t('Stok per rak dimuat otomatis.')}
                                             </p>
                                         )}
                                         <InputError message={errors.from_warehouse_id} />
@@ -214,9 +243,8 @@ export default function StockTransferCreate({ auth, newTransferNumber, warehouse
                                                 onChange={e => setData('to_warehouse_id', e.target.value)}
                                             >
                                                 <option value="">-- {t('Pilih Tujuan')} --</option>
-                                                {warehouses
-                                                    .filter(w => w.id != data.from_warehouse_id) 
-                                                    .map(w => <option key={w.id} value={w.id}>{w.name} ({w.code})</option>)}
+                                                {/* Sekarang user BISA memilih gudang yang sama (untuk pindah rak internal) */}
+                                                {warehouses.map(w => <option key={w.id} value={w.id}>{w.name} ({w.code})</option>)}
                                             </select>
                                         </div>
                                         <InputError message={errors.to_warehouse_id} />
@@ -236,7 +264,7 @@ export default function StockTransferCreate({ auth, newTransferNumber, warehouse
                                         )}
                                     </h3>
                                     
-                                    {availableProducts.length > 0 && (
+                                    {availableProducts.length > 0 && data.to_warehouse_id && (
                                         <button 
                                             type="button" 
                                             onClick={addLine} 
@@ -247,45 +275,45 @@ export default function StockTransferCreate({ auth, newTransferNumber, warehouse
                                     )}
                                 </div>
 
-                                {!data.from_warehouse_id ? (
+                                {!data.from_warehouse_id || !data.to_warehouse_id ? (
                                     <div className="p-10 text-center border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl bg-slate-50 dark:bg-slate-800/50 transition-colors">
                                         <Warehouse className="w-12 h-12 text-slate-300 dark:text-slate-500 mx-auto mb-3" />
-                                        <p className="text-slate-600 dark:text-slate-300 font-medium">{t('Pilih "Gudang Asal" terlebih dahulu')}</p>
-                                        <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">{t('Daftar barang akan muncul sesuai ketersediaan stok di gudang tersebut.')}</p>
+                                        <p className="text-slate-600 dark:text-slate-300 font-medium">{t('Pilih Gudang Asal & Tujuan terlebih dahulu')}</p>
                                     </div>
                                 ) : availableProducts.length === 0 && !isLoadingProducts ? (
                                     <div className="p-6 text-center bg-orange-50 dark:bg-orange-900/20 rounded-xl border border-orange-200 dark:border-orange-800/50 text-orange-700 dark:text-orange-400 transition-colors">
                                         <AlertCircle className="w-8 h-8 mx-auto mb-2 opacity-80" />
                                         <p className="font-bold text-lg">{t('Gudang Kosong')}</p>
-                                        <p className="text-sm opacity-80">{t('Tidak ada stok tersedia di gudang ini untuk dipindahkan.')}</p>
+                                        <p className="text-sm opacity-80">{t('Tidak ada stok tersedia di gudang asal untuk dipindahkan.')}</p>
                                     </div>
                                 ) : (
-                                    <div className="space-y-3 bg-slate-50 dark:bg-slate-900/50 p-5 rounded-xl border border-slate-200 dark:border-slate-700 transition-colors">
+                                    <div className="space-y-4 bg-slate-50 dark:bg-slate-900/50 p-4 sm:p-5 rounded-xl border border-slate-200 dark:border-slate-700 transition-colors">
                                         {lines.map((line, index) => {
-                                            const selectedProd = availableProducts.find(p => p.id == line.product_id);
+                                            const selectedStock = availableProducts.find(p => p.stock_id == line.stock_id);
+                                            const destLocations = getDestinationLocations();
                                             
                                             return (
-                                                <div key={index} className="flex flex-col sm:flex-row gap-4 items-start sm:items-end bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-600 ring-1 ring-transparent hover:ring-indigo-100 dark:hover:ring-indigo-900/50 transition-all">
+                                                <div key={index} className="flex flex-col xl:flex-row gap-4 items-start xl:items-end bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-600 ring-1 ring-transparent hover:ring-indigo-100 dark:hover:ring-indigo-900/50 transition-all">
                                                     
-                                                    {/* DROP DOWN PRODUK */}
+                                                    {/* DROP DOWN PRODUK DARI GUDANG ASAL */}
                                                     <div className="flex-1 w-full">
                                                         <div className="flex justify-between mb-1.5">
-                                                            <InputLabel value={`${t('Barang')} #${index + 1}`} className="text-xs text-slate-500 dark:text-slate-400" />
-                                                            {selectedProd && (
-                                                                <span className="text-xs font-bold text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-900/30 px-2 py-0.5 rounded-md border border-teal-100 dark:border-teal-800/50">
-                                                                    {t('Sisa')}: {selectedProd.available_qty} {selectedProd.unit}
+                                                            <InputLabel value={`${t('Barang & Rak Asal')} #${index + 1}`} className="text-xs text-slate-500 dark:text-slate-400" />
+                                                            {selectedStock && (
+                                                                <span className="text-[10px] sm:text-xs font-bold text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-900/30 px-2 py-0.5 rounded-md border border-teal-100 dark:border-teal-800/50">
+                                                                    {t('Sisa')}: {selectedStock.available_qty} {selectedStock.unit}
                                                                 </span>
                                                             )}
                                                         </div>
                                                         <select 
                                                             className="w-full border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 rounded-lg text-sm focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-indigo-500 dark:focus:ring-indigo-400 h-10 transition-colors"
-                                                            value={line.product_id}
-                                                            onChange={(e) => handleLineChange(index, 'product_id', e.target.value)}
+                                                            value={line.stock_id}
+                                                            onChange={(e) => handleLineChange(index, 'stock_id', e.target.value)}
                                                         >
-                                                            <option value="">-- {t('Pilih Produk')} --</option>
+                                                            <option value="">-- {t('Pilih Produk (Lokasi Asal)')} --</option>
                                                             {availableProducts.map(p => (
-                                                                <option key={p.id} value={p.id}>
-                                                                    {p.sku} - {p.name}
+                                                                <option key={p.stock_id} value={p.stock_id}>
+                                                                    {p.sku} - {p.name} [{t('Rak')}: {p.location_code}]
                                                                 </option>
                                                             ))}
                                                         </select>
@@ -293,45 +321,64 @@ export default function StockTransferCreate({ auth, newTransferNumber, warehouse
                                                             <p className="text-xs text-red-600 mt-1">{errors[`items.${index}.product_id`]}</p>
                                                         )}
                                                     </div>
-                                                    
-                                                    {/* INPUT QTY */}
-                                                    <div className="w-full sm:w-32">
-                                                        <InputLabel value={t('Qty Transfer')} className="mb-1.5 text-xs text-slate-500 dark:text-slate-400" />
-                                                        <div className="relative">
-                                                            <TextInput 
-                                                                type="number" 
-                                                                className="w-full text-center font-bold h-10 bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white focus:border-indigo-500 dark:focus:border-indigo-400 transition-colors" 
-                                                                min="1"
-                                                                max={selectedProd ? selectedProd.available_qty : ''}
-                                                                value={line.quantity}
-                                                                onChange={(e) => handleLineChange(index, 'quantity', e.target.value)}
-                                                                placeholder="0"
-                                                            />
-                                                            {selectedProd && (
-                                                                <span className="absolute right-3 top-2.5 text-xs text-slate-400 dark:text-slate-500 font-bold pointer-events-none">
-                                                                    {selectedProd.unit}
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                        {errors[`items.${index}.quantity`] && (
-                                                            <p className="text-xs text-red-600 mt-1">{errors[`items.${index}.quantity`]}</p>
-                                                        )}
+
+                                                    <div className="hidden xl:block pb-2 text-slate-300 dark:text-slate-600">
+                                                        <ArrowRight className="w-5 h-5" />
                                                     </div>
                                                     
-                                                    {/* BUTTON DELETE */}
-                                                    <button 
-                                                        type="button" 
-                                                        onClick={() => removeLine(index)}
-                                                        className={`w-full sm:w-10 h-10 flex justify-center items-center rounded-lg border transition-colors ${
-                                                            lines.length === 1 
-                                                            ? 'bg-slate-50 dark:bg-slate-700/50 border-slate-200 dark:border-slate-600 text-slate-300 dark:text-slate-500 cursor-not-allowed' 
-                                                            : 'bg-white dark:bg-slate-800 border-red-200 dark:border-red-900/50 text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 hover:border-red-300 shadow-sm'
-                                                        }`}
-                                                        disabled={lines.length === 1}
-                                                        title={t('Hapus Baris')}
-                                                    >
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </button>
+                                                    {/* DROP DOWN RAK TUJUAN */}
+                                                    <div className="w-full xl:w-48">
+                                                        <InputLabel value={t('Rak Tujuan')} className="mb-1.5 text-xs text-teal-600 dark:text-teal-400 font-bold" />
+                                                        <div className="relative">
+                                                            <Layers className="absolute left-2.5 top-2.5 w-4 h-4 text-slate-400 pointer-events-none" />
+                                                            <select 
+                                                                className="w-full pl-8 border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 rounded-lg text-sm focus:border-teal-500 dark:focus:border-teal-400 focus:ring-teal-500 dark:focus:ring-teal-400 h-10 transition-colors"
+                                                                value={line.to_location_id}
+                                                                onChange={(e) => handleLineChange(index, 'to_location_id', e.target.value)}
+                                                            >
+                                                                <option value="">-- {t('Tanpa Rak')} --</option>
+                                                                {destLocations.map(loc => (
+                                                                    <option key={loc.id} value={loc.id}>{loc.code}</option>
+                                                                ))}
+                                                            </select>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* INPUT QTY */}
+                                                    <div className="w-full xl:w-32 flex gap-4 xl:gap-0 justify-between items-end">
+                                                        <div className="flex-1">
+                                                            <InputLabel value={t('Qty Pindah')} className="mb-1.5 text-xs text-slate-500 dark:text-slate-400" />
+                                                            <div className="relative">
+                                                                <TextInput 
+                                                                    type="number" 
+                                                                    className="w-full text-center font-bold h-10 bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white focus:border-indigo-500 dark:focus:border-indigo-400 transition-colors" 
+                                                                    min="1"
+                                                                    max={selectedStock ? selectedStock.available_qty : ''}
+                                                                    value={line.quantity}
+                                                                    onChange={(e) => handleLineChange(index, 'quantity', e.target.value)}
+                                                                    placeholder="0"
+                                                                />
+                                                            </div>
+                                                            {errors[`items.${index}.quantity`] && (
+                                                                <p className="text-xs text-red-600 mt-1">{errors[`items.${index}.quantity`]}</p>
+                                                            )}
+                                                        </div>
+                                                        
+                                                        {/* BUTTON DELETE DI MOBILE TAMPIL DI KANAN QTY */}
+                                                        <button 
+                                                            type="button" 
+                                                            onClick={() => removeLine(index)}
+                                                            className={`xl:ml-4 w-10 h-10 flex shrink-0 justify-center items-center rounded-lg border transition-colors ${
+                                                                lines.length === 1 
+                                                                ? 'bg-slate-50 dark:bg-slate-700/50 border-slate-200 dark:border-slate-600 text-slate-300 dark:text-slate-500 cursor-not-allowed' 
+                                                                : 'bg-white dark:bg-slate-800 border-red-200 dark:border-red-900/50 text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 hover:border-red-300 shadow-sm'
+                                                            }`}
+                                                            disabled={lines.length === 1}
+                                                            title={t('Hapus Baris')}
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             );
                                         })}
@@ -347,7 +394,7 @@ export default function StockTransferCreate({ auth, newTransferNumber, warehouse
                                     <textarea 
                                         className="w-full mt-1 border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:border-indigo-500 dark:focus:border-indigo-400 rounded-lg shadow-sm text-sm transition-colors placeholder:text-slate-400 dark:placeholder:text-slate-500"
                                         rows="2"
-                                        placeholder={t('Contoh: Permintaan urgent dari tim produksi...')}
+                                        placeholder={t('Contoh: Permintaan pindah rak dari SPV...')}
                                         value={data.notes}
                                         onChange={e => setData('notes', e.target.value)}
                                     ></textarea>

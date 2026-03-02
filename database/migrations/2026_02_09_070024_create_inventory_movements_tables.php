@@ -26,6 +26,8 @@ return new class extends Migration
             $table->id();
             $table->foreignId('stock_transfer_id')->constrained('stock_transfers')->onDelete('cascade');
             $table->foreignId('product_id')->constrained('products');
+            $table->foreignId('from_location_id')->nullable()->constrained('locations')->nullOnDelete();
+            $table->foreignId('to_location_id')->nullable()->constrained('locations')->nullOnDelete();
             $table->integer('quantity');
             $table->timestamps();
         });
