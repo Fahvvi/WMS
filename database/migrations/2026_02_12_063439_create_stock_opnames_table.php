@@ -31,7 +31,7 @@ public function up(): void
             
             // Relasi ke Produk
             $table->foreignId('product_id')->constrained('products');
-            
+            $table->foreignId('location_id')->nullable()->constrained('locations')->nullOnDelete();
             // --- KOLOM PENTING YANG SEBELUMNYA HILANG ---
             $table->integer('system_qty'); // Stok menurut sistem saat opname dibuat
             $table->integer('actual_qty'); // Stok fisik hasil hitungan user

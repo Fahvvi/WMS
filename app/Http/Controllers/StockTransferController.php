@@ -10,6 +10,8 @@ use App\Models\Warehouse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
+use App\Notifications\StockTransferPending;
+use App\Models\User;
 use Illuminate\Validation\ValidationException;
 
 class StockTransferController extends Controller
@@ -140,6 +142,20 @@ class StockTransferController extends Controller
             }
 
             DB::commit();
+            $supervisors = User::permission('approve_transfers')->get();
+            $admins = User::role('Super Admin')->get();
+            
+            // Gabungkan data user dan hilangkan duplikat (jika ada admin yg juga punya permission)
+            $notifiableUsers = $supervisors->merge($admins)->unique('id');
+
+            foreach ($notifiableUsers as $user) {
+                // Jangan kirim notifikasi ke diri sendiri (jika pembuat adalah admin juga)
+                if ($user->id !== auth()->id()) {
+                    $user->notify(new StockTransferPending());
+                }
+            }
+            // ====================================================================
+
             return redirect()->route('stock-transfers.index')->with('success', 'Pengajuan transfer berhasil dibuat.');
 
         } catch (\Exception $e) {

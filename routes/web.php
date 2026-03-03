@@ -162,5 +162,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::resource('warehouses', WarehouseController::class)
         ->except(['index', 'create', 'edit', 'show'])
         ->middleware(['permission:manage_warehouses']);
+
+    // NOTIFICATIONS (Tandai sudah dibaca)
+    Route::post('/notifications/{id}/read', [\App\Http\Controllers\NotificationController::class, 'markAsRead'])->name('notifications.read');
+    Route::post('/notifications/read-all', [\App\Http\Controllers\NotificationController::class, 'markAllAsRead'])->name('notifications.read-all');
+
+
 });
 require __DIR__.'/auth.php';

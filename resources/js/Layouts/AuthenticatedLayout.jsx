@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { Link, usePage } from '@inertiajs/react';
 import { Menu, X, Bell, LogOut, User, LayoutDashboard, Package, ChevronDown, ArrowDownLeft, ArrowUpRight, Settings, ArrowRightLeft, ClipboardList } from 'lucide-react';
 import { Toaster, toast } from 'react-hot-toast';
-import { useLaravelReactI18n } from 'laravel-react-i18n'; // <--- IMPORT I18N DI SINI
+import NotificationDropdown from '@/Components/NotificationDropdown';
+import { useLaravelReactI18n } from 'laravel-react-i18n'; 
 
 export default function AuthenticatedLayout({ user, header, children }) {
     const [showingNavigationDropdown, setShowingNavigationDropdown] = useState(false);
@@ -13,7 +14,7 @@ export default function AuthenticatedLayout({ user, header, children }) {
     const inventoryTimeoutRef = useRef(null);
 
     const { props } = usePage(); 
-    const { t } = useLaravelReactI18n(); // <--- INISIALISASI FUNGSI TRANSLATE
+    const { t } = useLaravelReactI18n(); 
 
     // --- LOGIKA DARK MODE TEMA ---
     useEffect(() => {
@@ -79,7 +80,6 @@ export default function AuthenticatedLayout({ user, header, children }) {
         }, 200);
     };
 
-
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-900 transition-colors duration-200">
             {/* Pembungkus Utama dengan background dark mode */}
@@ -128,7 +128,7 @@ export default function AuthenticatedLayout({ user, header, children }) {
                                     >
                                         <button 
                                             className={`inline-flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 gap-2 ${
-                                                route().current('products.*') || route().current('stock-transfers.*')
+                                                route().current('products.*') || route().current('stock-transfers.*') || route().current('stock-opnames.*')
                                                     ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300 shadow-sm'
                                                     : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800/50'
                                             }`}
@@ -157,7 +157,7 @@ export default function AuthenticatedLayout({ user, header, children }) {
                                                 )}
                                                 
                                                 {canViewStockOpname && (
-                                                    <DropdownLink href={route('stock-opnames.index')} active={route().current('stock-opname.*')}>
+                                                    <DropdownLink href={route('stock-opnames.index')} active={route().current('stock-opnames.*')}>
                                                         <ClipboardList size={16} /> {t('Stock Opname')}
                                                     </DropdownLink>
                                                 )}
@@ -179,12 +179,12 @@ export default function AuthenticatedLayout({ user, header, children }) {
                             </div>
                         </div>
 
-                        {/* --- BAGIAN KANAN (PROFILE) --- */}
+                        {/* --- BAGIAN KANAN (PROFILE & NOTIFIKASI) --- */}
                         <div className="hidden sm:flex sm:items-center sm:gap-4">
-                            <button className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-slate-800 dark:hover:text-indigo-400 rounded-full transition relative">
-                                <Bell className="w-5 h-5" />
-                                <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border border-white dark:border-slate-900"></span>
-                            </button>
+                            
+                            {/* --- KOMPONEN NOTIFIKASI YANG BARU --- */}
+                            <NotificationDropdown />
+                            {/* ------------------------------------- */}
 
                             <div className="relative ml-3">
                                 <button 
@@ -271,7 +271,7 @@ export default function AuthenticatedLayout({ user, header, children }) {
                                     </MobileNavLink>
                                 )}
                                 {canViewStockOpname && (
-                                    <MobileNavLink href={route('stock-opnames.index')} active={route().current('stock-opname.*')} icon={<ClipboardList size={18}/>}>
+                                    <MobileNavLink href={route('stock-opnames.index')} active={route().current('stock-opnames.*')} icon={<ClipboardList size={18}/>}>
                                         {t('Stock Opname')}
                                     </MobileNavLink>
                                 )}

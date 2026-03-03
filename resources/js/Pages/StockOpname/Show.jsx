@@ -115,6 +115,10 @@ export default function StockOpnameShow({ auth, opname }) {
                                                         <td className="py-4 align-top">
                                                             <div className="font-bold text-slate-800 dark:text-slate-200 print:text-black">{item.product?.name}</div>
                                                             <div className="text-xs font-mono text-slate-500 dark:text-slate-400 mt-0.5 print:text-black">{item.product?.sku}</div>
+                                                            {/* BADGE RAK UNTUK LAPORAN */}
+                                                            <div className="mt-1 flex items-center gap-1 text-[10px] font-bold text-purple-600 print:text-black">
+                                                                <MapPin className="w-3 h-3 print:hidden" /> {item.location?.code || t('Tanpa Rak')}
+                                                            </div>
                                                         </td>
                                                         <td className="py-4 text-center align-top font-mono text-slate-500 dark:text-slate-400 print:text-black">
                                                             {item.system_qty} <span className="text-[10px]">{item.product?.unit}</span>

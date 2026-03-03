@@ -37,6 +37,10 @@ class HandleInertiaRequests extends Middleware
                 'permissions' => $request->user() 
                     ? $request->user()->getAllPermissions()->pluck('name') 
                     : [],
+
+                    'unread_notifications' => $request->user() 
+                    ? $request->user()->unreadNotifications()->take(10)->get() 
+                    : [],
             ],
             'locale' => fn () => $request->user() ? $request->user()->locale : 'id',
             'theme' => fn () => $request->user() ? $request->user()->theme : 'light',
