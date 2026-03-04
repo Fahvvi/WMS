@@ -85,11 +85,23 @@ class CategoryController extends Controller
         if (!auth()->user()->can('manage_categories')) abort(403);
 
         $request->validate([
-            'name' => ['required', 'string', 'max:255', Rule::unique('categories')->ignore($category->id)],
+            'name' => ['required', 'string', 'max:255', \Illuminate\Validation\Rule::unique('categories')->ignore($category->id)],
+            'code' => ['required', 'string', 'max:50'],
+            'color' => ['nullable', 'string', 'max:20'],
+            'parent_id' => ['nullable', 'exists:categories,id'], // Harus nullable agar bisa dilepas dari induk
         ]);
 
+        // Proteksi: Cegah kategori menjadi induk dari dirinya sendiri
+        if ($request->parent_id == $category->id) {
+            return back()->withErrors(['parent_id' => 'Kategori tidak boleh menjadi induk untuk dirinya sendiri.']);
+        }
+
+        // Update semua field
         $category->update([
-            'name' => $request->name
+            'name' => $request->name,
+            'code' => $request->code,
+            'color' => $request->color ?? '#6366f1',
+            'parent_id' => $request->parent_id, // Sekarang data null akan masuk dan menghapus induk
         ]);
 
         return back()->with('success', 'Kategori berhasil diperbarui.');

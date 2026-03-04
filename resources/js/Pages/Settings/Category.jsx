@@ -121,10 +121,23 @@ export default function CategoryIndex({ categories, allCategories, filters }) {
 
     const handleSubmit = (e) => {
         e.preventDefault();
+
+        // [PERBAIKAN] Ubah string kosong menjadi null agar backend tahu kita ingin melepas parent-nya
+        const payload = {
+            ...data,
+            parent_id: data.parent_id === '' ? null : data.parent_id
+        };
+
         if (isEditMode) {
-            put(route('settings.categories.update', editingCategory.id), { onSuccess: () => setIsModalOpen(false) });
+            put(route('settings.categories.update', editingCategory.id), { 
+                data: payload, // Gunakan payload yang sudah dibersihkan
+                onSuccess: () => setIsModalOpen(false) 
+            });
         } else {
-            post(route('settings.categories.store'), { onSuccess: () => setIsModalOpen(false) });
+            post(route('settings.categories.store'), { 
+                data: payload,
+                onSuccess: () => setIsModalOpen(false) 
+            });
         }
     };
 

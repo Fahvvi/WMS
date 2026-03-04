@@ -5,13 +5,14 @@ import {
     Search, Plus, Package, Filter, 
     Folder, FolderOpen, ChevronRight, ChevronDown, Save, X, 
     Edit, Printer, Trash2, MoreHorizontal, 
-    Upload, Download
+    Upload, Download, AlertCircle, Camera 
 } from 'lucide-react';
 import TextInput from '@/Components/TextInput';
 import Swal from 'sweetalert2';
 import InputLabel from '@/Components/InputLabel';
 import InputError from '@/Components/InputError';
 import { useLaravelReactI18n } from 'laravel-react-i18n'; 
+import BarcodeScanner from '@/Components/BarcodeScanner'; // <--- IMPORT SCANNER
 
 export default function MaterialIndex({ materials, categories, units, currentCategory, filters }) {
     const { t } = useLaravelReactI18n(); 
@@ -19,6 +20,9 @@ export default function MaterialIndex({ materials, categories, units, currentCat
     const [categorySearch, setCategorySearch] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
     
+    // State Scanner Khusus Modal
+    const [showScanner, setShowScanner] = useState(false);
+
     // State untuk Buka Tutup Folder Kategori
     const [openCategories, setOpenCategories] = useState({});
     
@@ -54,49 +58,60 @@ export default function MaterialIndex({ materials, categories, units, currentCat
 
     // --- ALGORITMA SISTEM POHON KATEGORI ---
     const structuredCategories = useMemo(() => {
-        const filtered = categories.filter(c => c.name.toLowerCase().includes(categorySearch.toLowerCase()));
-        
-        const tree = {}; // Untuk menyimpan Induk yang punya anak
-        const singles = []; // Untuk menyimpan kategori yang berdiri sendiri (tanpa anak)
+        const tree = {}; 
+        const singles = []; 
 
-        // Langkah 1: Kumpulkan semua data dan pisahkan Induk -> Anak
-        filtered.forEach(cat => {
-            const rawName = cat.name;
-            
-            // Cek apakah ada format "Induk -> Anak" (dengan spasi di sekitarnya)
-            if (rawName.includes('->')) {
-                const parts = rawName.split('->').map(p => p.trim());
-                const parent = parts[0];
-                const child = parts[1]; // Kita asumsikan hanya ada 1 level anak untuk saat ini
+        // 1. Pisahkan Induk (Root) dan Anak (Child) dari database
+        const roots = categories.filter(c => !c.parent_id);
+        const children = categories.filter(c => c.parent_id);
 
-                if (!tree[parent]) {
-                    tree[parent] = { isParent: true, children: [] };
+        // 2. Susun Anak ke dalam Induknya masing-masing
+        roots.forEach(root => {
+            const myChildren = children.filter(c => c.parent_id === root.id);
+
+            if (myChildren.length > 0) {
+                tree[root.name] = { 
+                    isParent: true, 
+                    originalName: root.name,
+                    children: myChildren.map(child => ({
+                        originalName: child.name, 
+                        displayName: child.name     
+                    }))
+                };
+            } else {
+                singles.push(root); // Induk yang tidak punya anak
+            }
+        });
+
+        // 3. Tangani Anak yang kehilangan Induk (Orphan)
+        children.forEach(child => {
+            if (!roots.find(r => r.id === child.parent_id)) {
+                singles.push(child);
+            }
+        });
+
+        // 4. Fitur Filter Pencarian (Search Bar Kategori Kiri)
+        if (categorySearch) {
+            const keyword = categorySearch.toLowerCase();
+            const filteredTree = {};
+            const filteredSingles = singles.filter(c => c.name.toLowerCase().includes(keyword));
+
+            Object.entries(tree).forEach(([parentName, group]) => {
+                const matchParent = parentName.toLowerCase().includes(keyword);
+                const matchedChildren = group.children.filter(c => c.displayName.toLowerCase().includes(keyword));
+
+                // Jika nama induk cocok ATAU ada nama anaknya yang cocok, tampilkan folder tersebut
+                if (matchParent || matchedChildren.length > 0) {
+                    filteredTree[parentName] = {
+                        ...group,
+                        children: matchParent ? group.children : matchedChildren
+                    };
                 }
-                
-                // Masukkan anak ke dalam array children induknya
-                tree[parent].children.push({
-                    originalName: rawName, // Format asli: "Elektronik -> Battery"
-                    displayName: child     // Format tampil: "Battery"
-                });
-            } else {
-                // Jika tidak ada '->', berarti dia kategori tunggal
-                singles.push(cat);
-            }
-        });
+            });
+            return { tree: filteredTree, singles: filteredSingles };
+        }
 
-        // Langkah 2: Periksa apakah kategori tunggal ternyata merupakan "Induk" dari kategori lain yang beranak
-        // (Misalnya: ada kategori "Elektronik" (singles), dan ada juga "Elektronik -> Battery" (tree))
-        const finalSingles = [];
-        singles.forEach(singleCat => {
-            if (tree[singleCat.name]) {
-                // Jika nama single ini ada di dalam Tree (berarti dia adalah Induk)
-                tree[singleCat.name].originalParentName = singleCat.name; 
-            } else {
-                finalSingles.push(singleCat);
-            }
-        });
-
-        return { tree, singles: finalSingles };
+        return { tree, singles };
     }, [categories, categorySearch]);
 
     const toggleCategoryGroup = (parentName) => {
@@ -167,18 +182,30 @@ export default function MaterialIndex({ materials, categories, units, currentCat
         }
     };
 
-    // Fungsi helper untuk mengecek apakah Induk Kategori sedang aktif (termasuk anak-anaknya)
     const isParentActive = (parentName) => {
         if (!currentCategory) return false;
-        // Jika currentCategory persis sama dengan parent (klik Induk)
         if (currentCategory === parentName) return true;
-        // Jika currentCategory dimulai dengan parentName (misal filter="Elektronik -> Battery" maka Induk "Elektronik" aktif)
-        if (currentCategory.startsWith(parentName + " ->")) return true;
+        
+        // Jika kita sedang mengklik kategori "Battery", cek apakah "Battery" ada di dalam grup "Elektronik"
+        const group = structuredCategories.tree[parentName];
+        if (group && group.children.some(c => c.originalName === currentCategory)) {
+            return true;
+        }
         return false;
+    };
+
+    // Handler jika scan berhasil dari modal
+    const handleCameraScan = (decodedText) => {
+        setShowScanner(false);
+        setData('sku', decodedText);
     };
 
     return (
         <SettingsLayout title={t('Material Master Data')}>
+            
+            {/* OVERLAY SCANNER */}
+            {showScanner && <BarcodeScanner onScanSuccess={handleCameraScan} onClose={() => setShowScanner(false)} />}
+
             <div className="flex h-[calc(100vh-10rem)] gap-4">
                 
                 {/* --- SIDEBAR KIRI (SISTEM POHON KATEGORI) --- */}
@@ -200,7 +227,6 @@ export default function MaterialIndex({ materials, categories, units, currentCat
                     </div>
 
                     <div className="flex-1 overflow-y-auto p-2 space-y-1 custom-scrollbar">
-                        {/* Tombol Semua Material */}
                         <button 
                             onClick={() => selectCategory(null)} 
                             className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${!currentCategory ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700/50'}`}
@@ -208,7 +234,6 @@ export default function MaterialIndex({ materials, categories, units, currentCat
                             <FolderOpen className="w-4 h-4" /> {t('Semua Material')}
                         </button>
                         
-                        {/* LOOP 1: Kategori Hierarki (Tree) */}
                         {Object.entries(structuredCategories.tree).map(([parentName, group]) => {
                             const isOpen = openCategories[parentName];
                             const parentActive = isParentActive(parentName);
@@ -216,17 +241,13 @@ export default function MaterialIndex({ materials, categories, units, currentCat
                             return (
                                 <div key={parentName} className="pt-1">
                                     <div className={`flex items-center justify-between px-2 py-1.5 rounded-lg text-sm transition-colors ${parentActive ? 'bg-indigo-50/50 dark:bg-indigo-900/20' : 'hover:bg-slate-50 dark:hover:bg-slate-700/30'}`}>
-                                        
                                         <div className="flex items-center gap-1 flex-1 overflow-hidden">
-                                            {/* Tombol Arrow Kiri untuk Buka Tutup Anak Kategori */}
                                             <button 
                                                 onClick={() => toggleCategoryGroup(parentName)} 
                                                 className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded transition-colors focus:outline-none"
                                             >
                                                 {isOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                                             </button>
-                                            
-                                            {/* Klik Teks Induk untuk Filter Semua Anak di Bawahnya */}
                                             <button 
                                                 className={`flex-1 flex items-center gap-2 text-left truncate transition-colors ${parentActive ? 'text-indigo-700 dark:text-indigo-400 font-bold' : 'text-slate-700 dark:text-slate-300 font-medium'}`}
                                                 onClick={() => selectCategory(parentName)}
@@ -237,7 +258,6 @@ export default function MaterialIndex({ materials, categories, units, currentCat
                                         </div>
                                     </div>
 
-                                    {/* Sub-Kategori Anak */}
                                     {isOpen && (
                                         <div className="ml-5 mt-1 border-l-2 border-slate-100 dark:border-slate-700 pl-3 space-y-1">
                                             {group.children.map((child, idx) => {
@@ -259,7 +279,6 @@ export default function MaterialIndex({ materials, categories, units, currentCat
                             );
                         })}
 
-                        {/* LOOP 2: Kategori Tunggal (Tidak punya anak dan bukan anak) */}
                         {structuredCategories.singles.length > 0 && <div className="h-px bg-slate-100 dark:bg-slate-700 my-3 mx-2"></div>}
                         {structuredCategories.singles.map((cat, idx) => (
                             <button 
@@ -281,7 +300,6 @@ export default function MaterialIndex({ materials, categories, units, currentCat
                     
                     {/* Header Toolbar Kanan */}
                     <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 bg-slate-50/50 dark:bg-slate-800/50">
-                        
                         <div className="relative w-full xl:max-w-xs">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                             <input 
@@ -346,11 +364,7 @@ export default function MaterialIndex({ materials, categories, units, currentCat
                                             <td className="px-4 py-3 border-r border-slate-100 dark:border-slate-700 hidden md:table-cell font-mono text-xs text-slate-500 select-all">
                                                 {item.barcode || item.sku}
                                             </td>
-                                            
-                                            {/* --- KOLOM AKSI (Hover Smooth Menu) --- */}
                                             <td className="px-2 py-3 text-center relative align-middle w-14">
-                                                
-                                                {/* Titik tiga yang pudar saat dihover */}
                                                 <div className="text-slate-300 dark:text-slate-600 transition-opacity duration-200 opacity-100 group-hover:opacity-0 md:hidden block">
                                                     <MoreHorizontal className="w-5 h-5 mx-auto" onClick={() => setActiveRowId(item.id)} />
                                                 </div>
@@ -358,7 +372,6 @@ export default function MaterialIndex({ materials, categories, units, currentCat
                                                     <MoreHorizontal className="w-5 h-5 mx-auto" />
                                                 </div>
 
-                                                {/* Toolbar Mengambang Otomatis Muncul Saat Mouse Di Atas Baris */}
                                                 <div className={`absolute right-4 top-1/2 -translate-y-1/2 z-30 flex items-center gap-1 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-600 p-1.5 transition-all duration-300 
                                                     ${activeRowId === item.id ? 'opacity-100 translate-x-0 pointer-events-auto' : 'opacity-0 translate-x-4 pointer-events-none md:group-hover:opacity-100 md:group-hover:translate-x-0 md:group-hover:pointer-events-auto'}`
                                                 }>
@@ -373,7 +386,6 @@ export default function MaterialIndex({ materials, categories, units, currentCat
                                                         <Trash2 className="w-4 h-4" />
                                                     </button>
 
-                                                    {/* Tombol Tutup Khusus Mobile (Bila aktif via klik) */}
                                                     {activeRowId === item.id && (
                                                         <button onClick={() => setActiveRowId(null)} className="md:hidden p-1.5 text-slate-400 hover:text-slate-600 rounded-lg">
                                                             <X className="w-4 h-4" />
@@ -395,7 +407,6 @@ export default function MaterialIndex({ materials, categories, units, currentCat
                         </table>
                     </div>
 
-                    {/* Pagination */}
                     <div className="p-3 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex justify-between items-center transition-colors">
                         <span className="text-xs text-slate-500 dark:text-slate-400">Total {materials.total}</span>
                         <div className="flex gap-1">
@@ -431,15 +442,39 @@ export default function MaterialIndex({ materials, categories, units, currentCat
                         <form onSubmit={handleSubmit} className="p-6 space-y-6">
                             
                             <div className="grid grid-cols-2 gap-6">
-                                <div className="col-span-2">
-                                    <InputLabel value={t('Nama Material / Produk *')} className="dark:text-slate-300" />
-                                    <TextInput 
-                                        className="w-full mt-1 bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100 focus:border-indigo-500 dark:focus:border-indigo-400" 
-                                        value={data.name} 
-                                        onChange={e => setData('name', e.target.value)} 
-                                        autoFocus 
-                                    />
-                                    <InputError message={errors.name} className="mt-1" />
+                                <div>
+                                    <InputLabel value={t('Kategori')} className="dark:text-slate-300" />
+                                    <select 
+                                        className="w-full mt-1 bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100 focus:border-indigo-500 dark:focus:border-indigo-400 rounded-xl shadow-sm text-sm h-10 transition-colors"
+                                        value={data.category}
+                                        onChange={e => setData('category', e.target.value)}
+                                    >
+                                        <option value="">-- {t('Pilih Kategori')} --</option>
+                                        
+                                        {/* Render Kategori Ber-induk (Hierarchy) */}
+                                        {Object.entries(structuredCategories.tree).map(([parentName, group]) => (
+                                            <optgroup key={parentName} label={parentName}>
+                                                <option value={parentName}>{parentName} (Induk)</option>
+                                                {group.children.map((child, idx) => (
+                                                    <option key={`${parentName}-${idx}`} value={child.originalName}>
+                                                        — {child.displayName}
+                                                    </option>
+                                                ))}
+                                            </optgroup>
+                                        ))}
+
+                                        {/* Render Kategori Tunggal (Single) */}
+                                        {structuredCategories.singles.length > 0 && (
+                                            <optgroup label="Lainnya">
+                                                {structuredCategories.singles.map((cat, idx) => (
+                                                    <option key={`single-${idx}`} value={cat.name}>
+                                                        {cat.name}
+                                                    </option>
+                                                ))}
+                                            </optgroup>
+                                        )}
+                                        
+                                    </select>
                                 </div>
                             </div>
 
@@ -450,40 +485,65 @@ export default function MaterialIndex({ materials, categories, units, currentCat
                                         {t('Auto jika kosong')}
                                     </span>
                                 </div>
-                                <TextInput 
-                                    className="w-full font-mono bg-white dark:bg-slate-900 border-blue-200 dark:border-blue-700/50 text-slate-900 dark:text-slate-100 focus:border-blue-500 dark:focus:border-blue-400" 
-                                    placeholder={t('(Kosongkan untuk Auto)')} 
-                                    value={data.sku} 
-                                    onChange={e => setData('sku', e.target.value)} 
-                                />
+                                {/* FLEX CONTAINER UNTUK INPUT SKU DAN TOMBOL KAMERA */}
+                                <div className="flex gap-2">
+                                    <TextInput 
+                                        className="w-full font-mono bg-white dark:bg-slate-900 border-blue-200 dark:border-blue-700/50 text-slate-900 dark:text-slate-100 focus:border-blue-500 dark:focus:border-blue-400" 
+                                        placeholder={t('(Kosongkan untuk Auto)')} 
+                                        value={data.sku} 
+                                        onChange={e => setData('sku', e.target.value)} 
+                                    />
+                                    {/* Tombol Kamera (Muncul hanya di Mobile: md:hidden) */}
+                                    <button 
+                                        type="button"
+                                        onClick={() => setShowScanner(true)}
+                                        className="flex-shrink-0 w-11 flex md:hidden items-center justify-center bg-blue-600 text-white rounded-lg shadow-sm hover:bg-blue-700 transition-colors"
+                                        title={t('Scan Barcode')}
+                                    >
+                                        <Camera className="w-5 h-5" />
+                                    </button>
+                                </div>
                                 <InputError message={errors.sku} className="mt-1" />
                             </div>
 
                             <div className="grid grid-cols-2 gap-6">
                                 <div>
                                     <InputLabel value={t('Kategori')} className="dark:text-slate-300" />
-                                    <TextInput 
-                                        className="w-full mt-1 bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100 focus:border-indigo-500 dark:focus:border-indigo-400" 
-                                        list="category-options" 
-                                        value={data.category} 
-                                        onChange={e => setData('category', e.target.value)} 
-                                        placeholder="Elektronik -> Battery"
-                                    />
-                                    <datalist id="category-options">
-                                        {categories.map((c, i) => <option key={i} value={c.name} />)}
-                                    </datalist>
+                                    <select 
+                                        className="w-full mt-1 bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100 focus:border-indigo-500 dark:focus:border-indigo-400 rounded-xl shadow-sm text-sm h-10 transition-colors"
+                                        value={data.category}
+                                        onChange={e => setData('category', e.target.value)}
+                                    >
+                                        <option value="">-- {t('Pilih Kategori')} --</option>
+                                        {categories.map((c, i) => (
+                                            <option key={i} value={c.name}>{c.name}</option>
+                                        ))}
+                                    </select>
                                 </div>
+
                                 <div>
-                                    <InputLabel value={t('Satuan *')} className="dark:text-slate-300" />
-                                    <TextInput 
-                                        className="w-full mt-1 bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100 focus:border-indigo-500 dark:focus:border-indigo-400" 
-                                        list="unit-options" 
-                                        value={data.unit} 
-                                        onChange={e => setData('unit', e.target.value)} 
-                                    />
-                                    <datalist id="unit-options">
-                                        {units.map((u, i) => <option key={i} value={u} />)}
-                                    </datalist>
+                                    <div className="flex justify-between items-center mb-1">
+                                        <InputLabel value={t('Satuan *')} className="dark:text-slate-300" />
+                                    </div>
+                                    <select 
+                                        className="w-full bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100 focus:border-indigo-500 dark:focus:border-indigo-400 rounded-xl shadow-sm text-sm h-10 transition-colors"
+                                        value={data.unit}
+                                        onChange={e => setData('unit', e.target.value)}
+                                    >
+                                        <option value="">-- {t('Pilih Satuan')} --</option>
+                                        {units.map((u, i) => (
+                                            <option key={i} value={u}>{u}</option>
+                                        ))}
+                                    </select>
+                                    <div className="mt-2 text-[10px] text-slate-500 dark:text-slate-400 flex items-start gap-1">
+                                        <AlertCircle className="w-3 h-3 shrink-0 mt-0.5" />
+                                        <span>
+                                            {t('Satuan tidak ada? Tambahkan di menu ')}
+                                            <Link href={route('settings.warehouses.index')} className="text-indigo-600 dark:text-indigo-400 hover:underline font-bold">
+                                                {t('Settings > Master Gudang & Unit')}
+                                            </Link>
+                                        </span>
+                                    </div>
                                     <InputError message={errors.unit} className="mt-1" />
                                 </div>
                             </div>
