@@ -451,7 +451,7 @@ export default function MaterialIndex({ materials, categories, units, currentCat
                                     >
                                         <option value="">-- {t('Pilih Kategori')} --</option>
                                         
-                                        {/* Render Kategori Ber-induk (Hierarchy) */}
+                                        {/* Tampilkan Induk beserta Anaknya */}
                                         {Object.entries(structuredCategories.tree).map(([parentName, group]) => (
                                             <optgroup key={parentName} label={parentName}>
                                                 <option value={parentName}>{parentName} (Induk)</option>
@@ -463,7 +463,7 @@ export default function MaterialIndex({ materials, categories, units, currentCat
                                             </optgroup>
                                         ))}
 
-                                        {/* Render Kategori Tunggal (Single) */}
+                                        {/* Tampilkan Kategori Tunggal */}
                                         {structuredCategories.singles.length > 0 && (
                                             <optgroup label="Lainnya">
                                                 {structuredCategories.singles.map((cat, idx) => (
@@ -473,7 +473,6 @@ export default function MaterialIndex({ materials, categories, units, currentCat
                                                 ))}
                                             </optgroup>
                                         )}
-                                        
                                     </select>
                                 </div>
                             </div>
