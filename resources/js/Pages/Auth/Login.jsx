@@ -179,7 +179,7 @@ export default function Login({ status, canResetPassword }) {
                                     autoComplete="username"
                                     isFocused={true}
                                     onChange={(e) => setData('email', e.target.value)}
-                                    placeholder={t('nama@perusahaan.com atau NIP')}
+                                    placeholder={t('nama@selarasdonlim.com atau NIP')}
                                 />
                             </div>
                             <InputError message={errors.email} className="mt-2" />
@@ -241,7 +241,7 @@ export default function Login({ status, canResetPassword }) {
 
                     {/* Footer */}
                     <div className="mt-8 text-center text-sm text-slate-400 dark:text-slate-500">
-                        &copy; {new Date().getFullYear()} WMS Pro System. All rights reserved.
+                        &copy; {new Date().getFullYear()} WMSkd System by IT. All rights reserved.
                     </div>
                 </div>
             </div>

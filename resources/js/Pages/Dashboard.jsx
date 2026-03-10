@@ -48,6 +48,21 @@ export default function Dashboard({ auth, stats, recent_inbound, recent_outbound
         };
     };
 
+    // --- LOGIKA SORTING & LIMIT 5 USER TEAM ---
+    const displayUsers = [...users].map(u => {
+        // Sisipkan status langsung ke dalam object agar mudah disortir
+        return { ...u, statusInfo: getUserStatus(u.last_login_at) };
+    }).sort((a, b) => {
+        // Prioritas 1: Jika satu aktif dan satu tidak, yang aktif naik ke atas
+        if (a.statusInfo.active !== b.statusInfo.active) {
+            return a.statusInfo.active ? -1 : 1;
+        }
+        // Prioritas 2: Jika sama-sama aktif / tidak aktif, urutkan dari waktu login terbaru
+        const dateA = a.last_login_at ? new Date(a.last_login_at).getTime() : 0;
+        const dateB = b.last_login_at ? new Date(b.last_login_at).getTime() : 0;
+        return dateB - dateA;
+    }).slice(0, 5); // Potong hanya 5 teratas
+
     // Komponen StatCard
     const StatCard = ({ title, value, icon, color, subtext }) => (
         <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex items-center gap-4 transition-colors">
@@ -119,13 +134,14 @@ export default function Dashboard({ auth, stats, recent_inbound, recent_outbound
                         subtext={t('Total Inbound & Outbound baru')}
                     />
                     {isAdmin && (
-                        <StatCard 
-                            title={t('User Aktif')} value={users.length} 
-                            icon={<Users size={24} />} 
-                            color="bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400"
-                            subtext={t('User terdaftar')}
-                        />
-                    )}
+                    <StatCard 
+                        // SEKARANG MENGAMBIL DARI METRIK STATS, BUKAN MENGHITUNG PANJANG ARRAY LAGI
+                        title={t('Total User')} value={stats.total_users} 
+                        icon={<Users size={24} />} 
+                        color="bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400"
+                        subtext={t('User terdaftar')}
+                    />
+                )}
                 </div>
 
                 {/* LAYOUT GRID */}
@@ -134,7 +150,7 @@ export default function Dashboard({ auth, stats, recent_inbound, recent_outbound
                     {/* KONTEN KIRI (Transaksi) */}
                     <div className={`${isAdmin ? 'lg:col-span-2' : 'lg:col-span-1'} space-y-8`}>
                         
-                        {/* JIKA ADMIN: Panel Inbound Lebar (Scrollable jika banyak) */}
+                        {/* JIKA ADMIN: Panel Inbound Lebar */}
                         {isAdmin && (
                             <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden transition-colors">
                                 <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-indigo-50/50 dark:bg-slate-800/80">
@@ -212,8 +228,9 @@ export default function Dashboard({ auth, stats, recent_inbound, recent_outbound
                                     </h3>
                                 </div>
                                 <div className="p-4 space-y-4 max-h-80 overflow-y-auto custom-scrollbar">
-                                    {users.map(u => {
-                                        const status = getUserStatus(u.last_login_at);
+                                    {/* MENGGUNAKAN displayUsers YANG SUDAH DI-SORT & SLICE */}
+                                    {displayUsers.map(u => {
+                                        const status = u.statusInfo;
                                         return (
                                             <div key={u.id} className="flex items-center gap-3">
                                                 <div className="h-10 w-10 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-300 font-bold border border-white dark:border-slate-600 shadow-sm shrink-0">
