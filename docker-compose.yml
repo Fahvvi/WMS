@@ -1,0 +1,42 @@
+services:
+  app:
+    build:
+      context: /share/container-data/wms-skd     # <--- UBAH DI SINI
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    volumes:
+      - /share/container-data/wms-skd:/var/www   # <--- UBAH DI SINI
+    networks:
+      - wms-network
+
+  web:
+    image: nginx:alpine
+    restart: unless-stopped
+    ports:
+      - "8088:80"
+    volumes:
+      - /share/container-data/wms-skd:/var/www   # <--- UBAH DI SINI
+      - /share/container-data/wms-skd/docker/nginx/app.conf:/etc/nginx/conf.d/default.conf # <--- UBAH DI SINI
+    depends_on:
+      - app
+    networks:
+      - wms-network
+
+  db:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: wms_database
+      POSTGRES_USER: wms_user
+      POSTGRES_PASSWORD: wms_password
+    volumes:
+      - qnap_postgres_data:/var/lib/postgresql/data
+    networks:
+      - wms-network
+
+networks:
+  wms-network:
+    driver: bridge
+
+volumes:
+  qnap_postgres_data:
