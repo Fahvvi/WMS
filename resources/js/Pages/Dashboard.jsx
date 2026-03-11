@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { useLaravelReactI18n } from 'laravel-react-i18n';
 
-export default function Dashboard({ auth, stats, recent_inbound, recent_outbound, users }) {
+export default function Dashboard({ auth, stats, recent_inbound, recent_outbound, users, low_stock_products }) {
     const { t } = useLaravelReactI18n();
 
     // Cek Role Admin
@@ -251,6 +251,41 @@ export default function Dashboard({ auth, stats, recent_inbound, recent_outbound
                                 </div>
                             </div>
                         )}
+
+
+                        {/* WIDGET: Low Stock Alert */}
+                        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-red-200 dark:border-red-900/50 overflow-hidden transition-colors">
+                            <div className="px-6 py-4 border-b border-red-100 dark:border-red-900/50 bg-red-50/50 dark:bg-red-900/20">
+                                <h3 className="font-bold text-red-700 dark:text-red-400 flex items-center gap-2">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+                                    {t('Peringatan Stok Menipis')}
+                                </h3>
+                            </div>
+                            <div className="p-0">
+                                <div className="divide-y divide-slate-100 dark:divide-slate-700/50">
+                                    {low_stock_products && low_stock_products.length > 0 ? (
+                                        low_stock_products.map((product) => (
+                                            <div key={product.id} className="p-4 flex justify-between items-center hover:bg-slate-50 dark:hover:bg-slate-700/30 transition">
+                                                <div className="overflow-hidden pr-2">
+                                                    <p className="text-sm font-bold text-slate-800 dark:text-slate-200 truncate">{product.name}</p>
+                                                    <p className="text-xs text-slate-500 dark:text-slate-400 truncate">SKU: {product.sku || '-'}</p>
+                                                </div>
+                                                <div className="text-right shrink-0">
+                                                    <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 border border-red-200 dark:border-red-800">
+                                                        {product.stocks_sum_quantity || 0} / {product.min_stock_alert} {product.unit}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <div className="p-6 text-center">
+                                            <p className="text-sm text-slate-500 dark:text-slate-400">{t('Semua stok barang dalam kondisi aman.')}</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
 
                         {/* Recent Activity Widget */}
                         <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden transition-colors">

@@ -45,6 +45,21 @@ class DashboardController extends Controller
         // 4. Daftar User untuk Widget Team (Tetap pertahankan ambil 5 yang paling baru login agar ringan)
         $users = User::orderByDesc('last_login_at')->take(5)->get();
 
+        // 5. Query Peringatan Stok Menipis (Low Stock Alert)
+        // Ambil semua produk beserta jumlah stoknya, saring yang <= min_stock_alert
+        $lowStockProducts = Product::withSum('stocks', 'quantity')
+            ->get()
+            ->filter(function ($product) {
+                // Jika tidak ada data stok sama sekali, anggap 0
+                $currentStock = $product->stocks_sum_quantity ?? 0;
+                // Bandingkan dengan kolom min_stock_alert bawaan Anda
+                return $currentStock <= $product->min_stock_alert; 
+            })
+            ->sortBy('stocks_sum_quantity') // Urutkan dari yang paling sedikit
+            ->take(5) // Ambil 5 teratas
+            ->values(); // Reset array index untuk React
+
+
         return Inertia::render('Dashboard', [
             'stats' => [
                 'total_products' => $totalProducts,
@@ -55,6 +70,7 @@ class DashboardController extends Controller
             'recent_inbound' => $recentInbound,
             'recent_outbound' => $recentOutbound,
             'users' => $users,
+            'low_stock_products' => $lowStockProducts,
         ]);
     }
 }
