@@ -18,8 +18,8 @@ return new class extends Migration
         $table->string('name');
         $table->text('description')->nullable();
         $table->string('category')->nullable();
-        $table->string('unit')->default('pcs'); // pcs, box, kg
-        $table->integer('min_stock_alert')->default(10); // Notifikasi jika stok tipis
+        $table->string('unit')->default('Pcs'); // pcs, box, kg
+        $table->integer('min_stock_alert')->default(5); // Notifikasi jika stok tipis
         $table->string('image_path')->nullable(); // Foto barang
         $table->timestamps();
     });

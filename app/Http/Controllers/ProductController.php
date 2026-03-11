@@ -69,6 +69,7 @@ class ProductController extends Controller
             'barcode' => 'nullable|string|max:50',
             'unit' => 'required|string|max:50',
             'category' => 'required|string|max:50',
+            'min_stock_alert' => 'nullable|integer|min:0',
         ]);
 
         // 2. Siapkan Variabel Penampung
@@ -148,11 +149,14 @@ class ProductController extends Controller
             'barcode' => 'nullable|string|max:50',
             'unit' => 'required|string|max:50',
             'category' => 'nullable|string|max:50',
+            'min_stock_alert' => $data['min_stock_alert'],
         ]);
 
         // 2. LOGIC UPDATE (Sama seperti Store)
         $finalSku = $request->sku;
         $finalBarcode = $request->barcode;
+        $data = $request->all();
+        $data['min_stock_alert'] = $request->min_stock_alert ?? 5;
 
         // Jika user mengosongkan SKU saat edit -> Generate Baru
         if (empty($finalSku)) {

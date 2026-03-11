@@ -5,7 +5,7 @@ import {
     Search, Plus, Package, Filter, 
     Folder, FolderOpen, ChevronRight, ChevronDown, Save, X, 
     Edit, Printer, Trash2, MoreHorizontal, 
-    Upload, Download, AlertCircle, Camera 
+    Upload, Download, AlertCircle, Camera, Check
 } from 'lucide-react';
 import TextInput from '@/Components/TextInput';
 import Swal from 'sweetalert2';
@@ -13,6 +13,73 @@ import InputLabel from '@/Components/InputLabel';
 import InputError from '@/Components/InputError';
 import { useLaravelReactI18n } from 'laravel-react-i18n'; 
 import BarcodeScanner from '@/Components/BarcodeScanner'; // <--- IMPORT SCANNER
+
+// --- FITUR BARU: KOMPONEN SEARCHABLE DROPDOWN ---
+const SearchableDropdown = ({ options, value, onChange, placeholder, disabled }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const [search, setSearch] = useState('');
+    const dropdownRef = useRef(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) setIsOpen(false);
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
+    const filteredOptions = options.filter(opt => opt.label.toLowerCase().includes(search.toLowerCase()));
+    const selectedOption = options.find(opt => opt.value === value);
+
+    return (
+        <div className="relative w-full" ref={dropdownRef}>
+            <button
+                type="button"
+                disabled={disabled}
+                onClick={() => setIsOpen(!isOpen)}
+                className={`w-full flex items-center justify-between mt-1 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-xl shadow-sm text-sm h-10 px-3 transition-colors ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+                <span className="truncate">{selectedOption ? selectedOption.label : placeholder}</span>
+                <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {isOpen && (
+                <div className="absolute z-50 w-full mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg overflow-hidden">
+                    <div className="p-2 border-b border-slate-100 dark:border-slate-700">
+                        <div className="relative">
+                            <Search className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-slate-400" />
+                            <input 
+                                type="text"
+                                className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 dark:bg-slate-900 border-none rounded-lg focus:ring-0"
+                                placeholder="Cari..."
+                                value={search}
+                                onChange={e => setSearch(e.target.value)}
+                                autoFocus
+                            />
+                        </div>
+                    </div>
+                    <div className="max-h-48 overflow-y-auto custom-scrollbar p-1">
+                        {filteredOptions.length > 0 ? (
+                            filteredOptions.map((opt, i) => (
+                                <button
+                                    key={i}
+                                    type="button"
+                                    onClick={() => { onChange(opt.value); setIsOpen(false); setSearch(''); }}
+                                    className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-lg transition-colors ${value === opt.value ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 font-bold' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50'}`}
+                                >
+                                    <span className={`truncate text-left ${opt.isChild ? 'ml-3' : ''}`}>{opt.label}</span>
+                                    {value === opt.value && <Check className="w-4 h-4 shrink-0 ml-2" />}
+                                </button>
+                            ))
+                        ) : (
+                            <div className="p-3 text-center text-xs text-slate-500">Tidak ditemukan</div>
+                        )}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
 
 export default function MaterialIndex({ materials, categories, units, currentCategory, filters }) {
     const { t } = useLaravelReactI18n(); 
@@ -32,6 +99,11 @@ export default function MaterialIndex({ materials, categories, units, currentCat
 
     const [isEditMode, setIsEditMode] = useState(false);
     const [editingId, setEditingId] = useState(null);
+
+    // FITUR BARU: State untuk Suggestion Barang & Timer Auto-Hide
+    const [similarProducts, setSimilarProducts] = useState([]);
+    const [showSimilar, setShowSimilar] = useState(false);
+    const hideTimeoutRef = useRef(null); // Reference untuk menyimpan timer
 
     const { data, setData, post, put, delete: destroy, processing, errors, reset, clearErrors } = useForm({
         name: '', sku: '', barcode: '', unit: '', category: currentCategory || '', min_stock_alert: 5
@@ -75,7 +147,7 @@ export default function MaterialIndex({ materials, categories, units, currentCat
                     originalName: root.name,
                     children: myChildren.map(child => ({
                         originalName: child.name, 
-                        displayName: child.name     
+                        displayName: child.name    
                     }))
                 };
             } else {
@@ -114,6 +186,24 @@ export default function MaterialIndex({ materials, categories, units, currentCat
         return { tree, singles };
     }, [categories, categorySearch]);
 
+    // FITUR BARU: Konversi Pohon Kategori ke format array untuk Combobox
+    const categoryOptions = useMemo(() => {
+        let options = [];
+        Object.entries(structuredCategories.tree).forEach(([parentName, group]) => {
+            options.push({ value: parentName, label: `📁 ${parentName} (Induk)`, isChild: false });
+            group.children.forEach(child => {
+                options.push({ value: child.originalName, label: `↳ ${child.displayName}`, isChild: true });
+            });
+        });
+        structuredCategories.singles.forEach(cat => {
+            options.push({ value: cat.name, label: `📄 ${cat.name}`, isChild: false });
+        });
+        return options;
+    }, [structuredCategories]);
+
+    // FITUR BARU: Format Unit untuk Combobox
+    const unitOptions = units.map(u => ({ value: u, label: u }));
+
     const toggleCategoryGroup = (parentName) => {
         setOpenCategories(prev => ({ ...prev, [parentName]: !prev[parentName] }));
     };
@@ -136,6 +226,8 @@ export default function MaterialIndex({ materials, categories, units, currentCat
         clearErrors();
         setIsModalOpen(true);
         setActiveRowId(null);
+        setSimilarProducts([]); // Reset suggest
+        setShowSimilar(false);
     };
 
     const openEditModal = (item) => {
@@ -152,6 +244,8 @@ export default function MaterialIndex({ materials, categories, units, currentCat
         clearErrors();
         setIsModalOpen(true);
         setActiveRowId(null); 
+        setSimilarProducts([]); // Reset suggest
+        setShowSimilar(false);
     };
 
     const handleDelete = (item) => {
@@ -198,6 +292,38 @@ export default function MaterialIndex({ materials, categories, units, currentCat
     const handleCameraScan = (decodedText) => {
         setShowScanner(false);
         setData('sku', decodedText);
+    };
+
+    // FITUR BARU: Handler untuk mengecek kemiripan nama dengan Auto-Hide (5 Detik)
+    const handleNameChange = (e) => {
+        const val = e.target.value;
+        setData('name', val);
+        
+        // Hapus timer lama jika user mengetik lagi
+        if (hideTimeoutRef.current) {
+            clearTimeout(hideTimeoutRef.current);
+        }
+
+        if (val.length >= 3) {
+            const keyword = val.toLowerCase();
+            const matches = materials.data.filter(m => 
+                m.name.toLowerCase().includes(keyword) && m.id !== editingId
+            ).slice(0, 3); // Tampilkan maksimal 3 teratas
+            
+            setSimilarProducts(matches);
+            setShowSimilar(matches.length > 0);
+
+            // Set timer baru untuk menyembunyikan suggest setelah 2 detik
+            if (matches.length > 0) {
+                hideTimeoutRef.current = setTimeout(() => {
+                    setShowSimilar(false);
+                }, 2000); // 5000 ms = 5 detik
+            }
+
+        } else {
+            setShowSimilar(false);
+            setSimilarProducts([]);
+        }
     };
 
     return (
@@ -428,8 +554,9 @@ export default function MaterialIndex({ materials, categories, units, currentCat
             {/* --- MODAL FORM --- */}
             {isModalOpen && (
                 <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/50 dark:bg-slate-900/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-                    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden border border-slate-200 dark:border-slate-700 transition-colors">
-                        <div className="bg-slate-50 dark:bg-slate-800/80 px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
+                    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[95vh] flex flex-col overflow-hidden border border-slate-200 dark:border-slate-700 transition-colors">
+                        
+                        <div className="bg-slate-50 dark:bg-slate-800/80 px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center shrink-0">
                             <h3 className="font-bold text-lg text-slate-800 dark:text-slate-100 flex items-center gap-2">
                                 <Package className={`w-5 h-5 ${isEditMode ? 'text-orange-600 dark:text-orange-400' : 'text-indigo-600 dark:text-indigo-400'}`} /> 
                                 {isEditMode ? t('Edit Material') : t('Material Baru')}
@@ -439,124 +566,150 @@ export default function MaterialIndex({ materials, categories, units, currentCat
                             </button>
                         </div>
 
-                        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+                        <form onSubmit={handleSubmit} className="flex flex-col min-h-0">
                             
-                            <div className="grid grid-cols-2 gap-6">
-                                <div>
-                                    <InputLabel value={t('Kategori')} className="dark:text-slate-300" />
-                                    <select 
-                                        className="w-full mt-1 bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100 focus:border-indigo-500 dark:focus:border-indigo-400 rounded-xl shadow-sm text-sm h-10 transition-colors"
-                                        value={data.category}
-                                        onChange={e => setData('category', e.target.value)}
-                                    >
-                                        <option value="">-- {t('Pilih Kategori')} --</option>
-                                        
-                                        {/* Tampilkan Induk beserta Anaknya */}
-                                        {Object.entries(structuredCategories.tree).map(([parentName, group]) => (
-                                            <optgroup key={parentName} label={parentName}>
-                                                <option value={parentName}>{parentName} (Induk)</option>
-                                                {group.children.map((child, idx) => (
-                                                    <option key={`${parentName}-${idx}`} value={child.originalName}>
-                                                        — {child.displayName}
-                                                    </option>
-                                                ))}
-                                            </optgroup>
-                                        ))}
+                            <div className="p-4 sm:p-6 space-y-6 overflow-y-auto custom-scrollbar">
+                                
+                                {/* --- BARIS 1: NAMA MATERIAL & SKU --- */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="relative">
+                                        <InputLabel value={t('Nama Material *')} className="dark:text-slate-300" />
+                                        <TextInput 
+                                            className="w-full mt-1 bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100 focus:border-indigo-500 dark:focus:border-indigo-400 rounded-xl shadow-sm text-sm h-10 transition-colors"
+                                            value={data.name}
+                                            onChange={handleNameChange} // MENGGUNAKAN HANDLER BARU
+                                            required
+                                            placeholder={t('Contoh: Baut Baja 10mm')}
+                                            autoComplete="off"
+                                        />
+                                        <InputError message={errors.name} className="mt-1" />
 
-                                        {/* Tampilkan Kategori Tunggal */}
-                                        {structuredCategories.singles.length > 0 && (
-                                            <optgroup label="Lainnya">
-                                                {structuredCategories.singles.map((cat, idx) => (
-                                                    <option key={`single-${idx}`} value={cat.name}>
-                                                        {cat.name}
-                                                    </option>
-                                                ))}
-                                            </optgroup>
+                                        {/* FITUR BARU: AUTO-SUGGEST NAMA MIRIP (DESAIN MINIMALIS) */}
+                                        {showSimilar && (
+                                            <div className="absolute z-10 w-full mt-1 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg shadow-sm p-2 text-xs text-slate-600 dark:text-slate-300 animate-in fade-in slide-in-from-top-1">
+                                                <p className="font-semibold mb-1 flex items-center gap-1 text-[10px] text-slate-400 dark:text-slate-400">
+                                                    Mirip dengan:
+                                                </p>
+                                                <ul className="space-y-0.5">
+                                                    {similarProducts.map(p => (
+                                                        <li key={p.id} className="flex justify-between items-center bg-white dark:bg-slate-800 px-2 py-1 rounded border border-slate-100 dark:border-slate-600">
+                                                            <span className="truncate pr-2">{p.name}</span>
+                                                            <span className="text-[9px] text-slate-400 font-mono bg-slate-50 dark:bg-slate-900 px-1 rounded shrink-0">{p.sku}</span>
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            </div>
                                         )}
-                                    </select>
-                                </div>
-                            </div>
-
-                            <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl border border-blue-100 dark:border-blue-800/50">
-                                <div className="flex justify-between items-center mb-2">
-                                    <InputLabel value={t('SKU / Kode')} className="text-blue-800 dark:text-blue-300 font-bold" />
-                                    <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/50 px-2 py-0.5 rounded">
-                                        {t('Auto jika kosong')}
-                                    </span>
-                                </div>
-                                {/* FLEX CONTAINER UNTUK INPUT SKU DAN TOMBOL KAMERA */}
-                                <div className="flex gap-2">
-                                    <TextInput 
-                                        className="w-full font-mono bg-white dark:bg-slate-900 border-blue-200 dark:border-blue-700/50 text-slate-900 dark:text-slate-100 focus:border-blue-500 dark:focus:border-blue-400" 
-                                        placeholder={t('(Kosongkan untuk Auto)')} 
-                                        value={data.sku} 
-                                        onChange={e => setData('sku', e.target.value)} 
-                                    />
-                                    {/* Tombol Kamera (Muncul hanya di Mobile: md:hidden) */}
-                                    <button 
-                                        type="button"
-                                        onClick={() => setShowScanner(true)}
-                                        className="flex-shrink-0 w-11 flex md:hidden items-center justify-center bg-blue-600 text-white rounded-lg shadow-sm hover:bg-blue-700 transition-colors"
-                                        title={t('Scan Barcode')}
-                                    >
-                                        <Camera className="w-5 h-5" />
-                                    </button>
-                                </div>
-                                <InputError message={errors.sku} className="mt-1" />
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-6">
-                                <div>
-                                    <InputLabel value={t('Kategori')} className="dark:text-slate-300" />
-                                    <select 
-                                        className="w-full mt-1 bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100 focus:border-indigo-500 dark:focus:border-indigo-400 rounded-xl shadow-sm text-sm h-10 transition-colors"
-                                        value={data.category}
-                                        onChange={e => setData('category', e.target.value)}
-                                    >
-                                        <option value="">-- {t('Pilih Kategori')} --</option>
-                                        {categories.map((c, i) => (
-                                            <option key={i} value={c.name}>{c.name}</option>
-                                        ))}
-                                    </select>
-                                </div>
-
-                                <div>
-                                    <div className="flex justify-between items-center mb-1">
-                                        <InputLabel value={t('Satuan *')} className="dark:text-slate-300" />
                                     </div>
-                                    <select 
-                                        className="w-full bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100 focus:border-indigo-500 dark:focus:border-indigo-400 rounded-xl shadow-sm text-sm h-10 transition-colors"
-                                        value={data.unit}
-                                        onChange={e => setData('unit', e.target.value)}
-                                    >
-                                        <option value="">-- {t('Pilih Satuan')} --</option>
-                                        {units.map((u, i) => (
-                                            <option key={i} value={u}>{u}</option>
-                                        ))}
-                                    </select>
-                                    <div className="mt-2 text-[10px] text-slate-500 dark:text-slate-400 flex items-start gap-1">
-                                        <AlertCircle className="w-3 h-3 shrink-0 mt-0.5" />
-                                        <span>
-                                            {t('Satuan tidak ada? Tambahkan di menu ')}
-                                            <Link href={route('settings.warehouses.index')} className="text-indigo-600 dark:text-indigo-400 hover:underline font-bold">
-                                                {t('Settings > Master Gudang & Unit')}
-                                            </Link>
-                                        </span>
+
+                                    <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl border border-blue-100 dark:border-blue-800/50">
+                                        <div className="flex justify-between items-center mb-2">
+                                            <InputLabel value={t('SKU / Kode')} className="text-blue-800 dark:text-blue-300 font-bold" />
+                                            <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/50 px-2 py-0.5 rounded">
+                                                {t('Auto jika kosong')}
+                                            </span>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <TextInput 
+                                                className="w-full font-mono bg-white dark:bg-slate-900 border-blue-200 dark:border-blue-700/50 text-slate-900 dark:text-slate-100 focus:border-blue-500 dark:focus:border-blue-400 h-10 rounded-xl" 
+                                                placeholder={t('(Kosongkan untuk Auto)')} 
+                                                value={data.sku} 
+                                                onChange={e => setData('sku', e.target.value)} 
+                                            />
+                                            <button 
+                                                type="button"
+                                                onClick={() => setShowScanner(true)}
+                                                className="flex-shrink-0 w-11 flex md:hidden items-center justify-center bg-blue-600 text-white rounded-lg shadow-sm hover:bg-blue-700 transition-colors"
+                                                title={t('Scan Barcode')}
+                                            >
+                                                <Camera className="w-5 h-5" />
+                                            </button>
+                                        </div>
+                                        <InputError message={errors.sku} className="mt-1" />
                                     </div>
-                                    <InputError message={errors.unit} className="mt-1" />
+                                </div>
+
+                                {/* --- BARIS 2: KATEGORI & SATUAN (MENGGUNAKAN COMBOBOX BARU) --- */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <InputLabel value={t('Kategori')} className="dark:text-slate-300" />
+                                        <SearchableDropdown 
+                                            options={categoryOptions}
+                                            value={data.category}
+                                            onChange={(val) => setData('category', val)}
+                                            placeholder="-- Pilih Kategori --"
+                                        />
+                                        <div className="mt-2 text-[10px] text-slate-500 dark:text-slate-400 flex items-start gap-1">
+                                            <AlertCircle className="w-3 h-3 shrink-0 mt-0.5" />
+                                            <span>
+                                                {t('Kategori tidak ada? Tambahkan di menu ')}
+                                                <Link href={route('settings.categories.index')} className="text-indigo-600 dark:text-indigo-400 hover:underline font-bold">
+                                                    {t('Settings > Kategori')}
+                                                </Link>
+                                            </span>
+                                        </div>
+                                        <InputError message={errors.category} className="mt-1" />
+                                    </div>
+
+                                    <div>
+                                        <div className="flex justify-between items-center mb-1">
+                                            <InputLabel value={t('Satuan *')} className="dark:text-slate-300" />
+                                        </div>
+                                        <SearchableDropdown 
+                                            options={unitOptions}
+                                            value={data.unit}
+                                            onChange={(val) => setData('unit', val)}
+                                            placeholder="-- Pilih Satuan --"
+                                        />
+                                        <div className="mt-2 text-[10px] text-slate-500 dark:text-slate-400 flex items-start gap-1">
+                                            <AlertCircle className="w-3 h-3 shrink-0 mt-0.5" />
+                                            <span>
+                                                {t('Satuan tidak ada? Tambahkan di menu ')}
+                                                <Link href={route('settings.warehouses.index')} className="text-indigo-600 dark:text-indigo-400 hover:underline font-bold">
+                                                    {t('Settings > Master Gudang')}
+                                                </Link>
+                                            </span>
+                                        </div>
+                                        <InputError message={errors.unit} className="mt-1" />
+                                    </div>
+                                </div>
+
+                                {/* --- BARIS 3: MINIMUM STOCK ALERT --- */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2 border-t border-slate-100 dark:border-slate-700/50">
+                                    <div>
+                                        <div className="flex justify-between items-center mb-1">
+                                            <InputLabel value={t('Batas Minimum Stok')} className="dark:text-slate-300 font-bold" />
+                                            <span className="text-[10px] text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">
+                                                {t('Opsional (Default: 5)')}
+                                            </span>
+                                        </div>
+                                        <TextInput 
+                                            type="number"
+                                            min="0"
+                                            className="w-full bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100 focus:border-indigo-500 dark:focus:border-indigo-400 rounded-xl shadow-sm text-sm h-10 transition-colors"
+                                            placeholder="5"
+                                            value={data.min_stock_alert}
+                                            onChange={e => setData('min_stock_alert', e.target.value)}
+                                        />
+                                        <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1.5">
+                                            {t('Sistem akan memberi peringatan di Dashboard jika stok menyentuh angka ini.')}
+                                        </p>
+                                        <InputError message={errors.min_stock_alert} className="mt-1" />
+                                    </div>
                                 </div>
                             </div>
 
-                            <div className="pt-4 border-t border-slate-100 dark:border-slate-700 flex justify-end gap-3">
+                            {/* FOOTER MODAL (TOMBOL ACTION - TETAP DI BAWAH UNTUK MOBILE) */}
+                            <div className="p-4 sm:p-6 border-t border-slate-100 dark:border-slate-700 flex justify-end gap-3 shrink-0 bg-slate-50/50 dark:bg-slate-800/50">
                                 <button type="button" onClick={() => setIsModalOpen(false)} className="px-5 py-2.5 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl font-bold text-sm transition-colors">
                                     {t('Batal')}
                                 </button>
                                 <button 
                                     type="submit" 
                                     disabled={processing}
-                                    className={`px-6 py-2.5 text-white rounded-xl font-bold text-sm shadow-md flex items-center gap-2 transition-colors ${isEditMode ? 'bg-orange-600 hover:bg-orange-700 dark:bg-orange-500 dark:hover:bg-orange-600' : 'bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600'}`}
+                                    className={`px-6 py-2.5 text-white rounded-xl font-bold text-sm shadow-md flex items-center gap-2 transition-colors ${isEditMode ? 'bg-orange-600 hover:bg-orange-700 dark:bg-orange-500' : 'bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500'}`}
                                 >
-                                    <Save className="w-4 h-4" /> {isEditMode ? t('Simpan') : t('Buat')}
+                                    <Save className="w-4 h-4" /> {isEditMode ? t('Simpan Perubahan') : t('Buat Material')}
                                 </button>
                             </div>
                         </form>
